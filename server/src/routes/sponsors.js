@@ -1,6 +1,7 @@
 import { Router } from 'express'
 
 import { createWithUniqueReference } from '../lib/reference.js'
+import { sendSponsorConfirmationEmail } from '../lib/mailer.js'
 import { Sponsor } from '../models/Sponsor.js'
 
 export const sponsorsRouter = Router()
@@ -25,6 +26,11 @@ sponsorsRouter.post('/', async (req, res, next) => {
           reference,
         }),
       'SPN',
+    )
+
+    // Send confirmation email asynchronously
+    sendSponsorConfirmationEmail({ sponsor: doc }).catch((err) =>
+      console.error('[mailer] Failed to send sponsor email:', err),
     )
 
     res.status(201).json({ reference: doc.reference })

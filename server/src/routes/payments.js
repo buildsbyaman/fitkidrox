@@ -9,6 +9,7 @@ import {
   verifySignature,
 } from '../lib/razorpay.js'
 import { assignBibToParticipant } from '../lib/bib.js'
+import { sendParticipantConfirmationEmail } from '../lib/mailer.js'
 import { Participant } from '../models/Participant.js'
 
 export const paymentsRouter = Router()
@@ -144,9 +145,7 @@ paymentsRouter.post('/verify-payment', async (req, res) => {
   }
 
   try {
-    const participant = await Participant.findOne({ reference })
-      .select('payment.status payment.orderId category dob bibNumber heat course')
-      .lean()
+    const participant = await Participant.findOne({ reference }).lean()
 
     if (!participant) {
       return res.status(404).json({ error: 'Unknown registration reference.' })
@@ -208,6 +207,24 @@ paymentsRouter.post('/verify-payment', async (req, res) => {
       ParticipantModel: Participant,
       allowReserved: false,
     })
+
+    // Send branded confirmation email to parent/guardian
+    sendParticipantConfirmationEmail({
+      participant: {
+        ...participant,
+        payment: {
+          ...participant.payment,
+          status: 'paid',
+          orderId,
+          paymentId,
+        },
+      },
+      bibNumber: bibResult.bibNumber,
+      heat: bibResult.heat,
+      course: bibResult.course,
+    }).catch((err) =>
+      console.error('[mailer] Failed to send participant confirmation email:', err),
+    )
 
     return res.json({
       ok: true,

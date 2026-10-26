@@ -1,6 +1,7 @@
 import { Router } from 'express'
 
 import { createWithUniqueReference } from '../lib/reference.js'
+import { sendSchoolConfirmationEmail } from '../lib/mailer.js'
 import { School } from '../models/School.js'
 
 export const schoolsRouter = Router()
@@ -40,6 +41,11 @@ schoolsRouter.post('/', async (req, res, next) => {
           roster,
         }),
       'SCH',
+    )
+
+    // Send confirmation email asynchronously
+    sendSchoolConfirmationEmail({ school: doc }).catch((err) =>
+      console.error('[mailer] Failed to send school email:', err),
     )
 
     res.status(201).json({ reference: doc.reference })

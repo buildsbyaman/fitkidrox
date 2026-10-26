@@ -2597,7 +2597,7 @@ function HeatSheetsView({
                 </h3>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="space-y-4">
                 {heatNums.map((heatNum) => {
                   const athletes = heatsObj[heatNum]
                   const courseName =
@@ -2609,7 +2609,7 @@ function HeatSheetsView({
                   return (
                     <div
                       key={`${categoryName}-heat-${heatNum}`}
-                      className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-xs"
+                      className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-xs w-full"
                     >
                       {/* Heat Card Header */}
                       <div className="bg-slate-50/80 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
@@ -2642,28 +2642,31 @@ function HeatSheetsView({
                           <div
                             key={ath._id}
                             className={cn(
-                              'p-3 flex items-center justify-between gap-3 text-xs transition-colors',
+                              'p-3 sm:px-4 flex items-center justify-between gap-3 text-xs transition-colors',
                               ath.checkedIn
                                 ? 'bg-emerald-50/30'
                                 : 'hover:bg-slate-50/60',
                             )}
                           >
                             {/* Bib & Name */}
-                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
                               <span className="font-mono text-xs font-bold px-2 py-1 rounded bg-slate-900 text-white shadow-xs shrink-0 select-all">
                                 #{ath.bibNumber}
                               </span>
-                              <div className="min-w-0 flex-1">
+                              <div className="min-w-0 flex-1 sm:grid sm:grid-cols-2 md:grid-cols-3 sm:items-center sm:gap-4">
                                 <div className="font-bold text-slate-900 truncate">
                                   {ath.childName}{' '}
                                   <span className="text-slate-400 font-normal">
                                     ({ath.gender})
                                   </span>
                                 </div>
-                                <div className="text-[11px] text-slate-500 truncate flex items-center gap-1.5 mt-0.5">
-                                  <span>{ath.school || 'Individual'}</span>
+                                <div className="text-[11px] text-slate-500 truncate flex items-center gap-1.5 mt-0.5 sm:mt-0">
+                                  <span className="font-medium text-slate-700">{ath.school || 'Individual'}</span>
                                   <span className="text-slate-300">·</span>
                                   <span>{ath.tshirt}</span>
+                                </div>
+                                <div className="hidden md:block text-[11px] text-slate-500 truncate">
+                                  Guardian: <span className="font-medium text-slate-700">{ath.guardianName || '—'}</span>
                                 </div>
                               </div>
                             </div>

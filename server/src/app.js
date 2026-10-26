@@ -18,6 +18,7 @@ import {
 import mongoose from 'mongoose'
 import { dbStatus } from './db.js'
 import { assignBibToParticipant } from './lib/bib.js'
+import { sendParticipantConfirmationEmail } from './lib/mailer.js'
 import { createWithUniqueReference } from './lib/reference.js'
 import { Participant } from './models/Participant.js'
 import { School } from './models/School.js'
@@ -326,6 +327,14 @@ export function createApp({
           allowReserved: true,
         })
         finalDoc = bibResult.participant
+        sendParticipantConfirmationEmail({
+          participant: finalDoc,
+          bibNumber: bibResult.bibNumber,
+          heat: bibResult.heat,
+          course: bibResult.course,
+        }).catch((err) =>
+          console.error('[mailer] Failed to send admin participant email:', err),
+        )
       }
 
       res.status(201).json({ ok: true, doc: finalDoc })
@@ -408,6 +417,14 @@ export function createApp({
             allowReserved: true,
           })
           doc = bibResult.participant
+          sendParticipantConfirmationEmail({
+            participant: doc,
+            bibNumber: bibResult.bibNumber,
+            heat: bibResult.heat,
+            course: bibResult.course,
+          }).catch((err) =>
+            console.error('[mailer] Failed to send participant confirmation email:', err),
+          )
         }
 
         res.json({ ok: true, doc })
