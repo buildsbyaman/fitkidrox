@@ -10,6 +10,7 @@ export const getRouter = () => {
     routeTree,
     defaultErrorComponent: RouteErrorPage,
     scrollRestoration: true,
+    scrollRestorationBehavior: 'instant',
     defaultPreloadStaleTime: 0,
   })
 

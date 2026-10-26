@@ -10,16 +10,48 @@ export const participantsRouter = Router()
  */
 participantsRouter.post('/', async (req, res, next) => {
   try {
-    const body = req.body ?? {}
+    const {
+      childName,
+      dob,
+      gender,
+      tshirt,
+      school,
+      category,
+      guardianName,
+      guardianPhone,
+      guardianEmail,
+      relation,
+      medicalNotes,
+    } = req.body ?? {}
 
     const doc = await createWithUniqueReference(
       (reference) =>
         Participant.create({
-          ...body,
+          childName: typeof childName === 'string' ? childName.trim() : '',
+          dob: typeof dob === 'string' ? dob.trim() : '',
+          gender: typeof gender === 'string' ? gender.trim() : '',
+          tshirt: typeof tshirt === 'string' ? tshirt.trim() : '',
+          school: typeof school === 'string' ? school.trim() : '',
+          category: typeof category === 'string' ? category.trim() : '',
+          guardianName:
+            typeof guardianName === 'string' ? guardianName.trim() : '',
+          guardianPhone:
+            typeof guardianPhone === 'string' ? guardianPhone.trim() : '',
+          guardianEmail:
+            typeof guardianEmail === 'string' ? guardianEmail.trim() : '',
+          relation: typeof relation === 'string' ? relation.trim() : 'Parent',
+          medicalNotes:
+            typeof medicalNotes === 'string' ? medicalNotes.trim() : '',
           reference,
-          consentParticipation: body.consentParticipation === true,
-          consentMedical: body.consentMedical === true,
-          consentPhotos: body.consentPhotos === true,
+          consentParticipation: req.body?.consentParticipation === true,
+          consentMedical: req.body?.consentMedical === true,
+          consentPhotos: req.body?.consentPhotos === true,
+          payment: {
+            status: 'unpaid',
+            orderId: '',
+            paymentId: '',
+          },
+          isManual: false,
         }),
       'FKX',
     )

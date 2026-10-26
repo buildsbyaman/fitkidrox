@@ -10,10 +10,20 @@ export const sponsorsRouter = Router()
  */
 sponsorsRouter.post('/', async (req, res, next) => {
   try {
-    const body = req.body ?? {}
+    const { company, contact, email, phone, packageId, message } =
+      req.body ?? {}
 
     const doc = await createWithUniqueReference(
-      (reference) => Sponsor.create({ ...body, reference }),
+      (reference) =>
+        Sponsor.create({
+          company: typeof company === 'string' ? company.trim() : '',
+          contact: typeof contact === 'string' ? contact.trim() : '',
+          email: typeof email === 'string' ? email.trim() : '',
+          phone: typeof phone === 'string' ? phone.trim() : '',
+          packageId: typeof packageId === 'string' ? packageId.trim() : '',
+          message: typeof message === 'string' ? message.trim() : '',
+          reference,
+        }),
       'SPN',
     )
 

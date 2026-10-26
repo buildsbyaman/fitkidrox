@@ -34,7 +34,131 @@ import { formatINR } from '@/lib/format'
 import { cdnImage } from '@/lib/image'
 import { cn } from '@/lib/utils'
 
+const homeStructuredData = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'SportsEvent',
+    name: 'FITKIDROX Chandigarh 2026 — Kids Fitness Challenge',
+    alternateName: 'FITKIDROX 2026',
+    description:
+      'India’s premier supervised, age-appropriate youth fitness race for children aged 3 to 13+. Featuring obstacle circuits, endurance runs, and age-adapted athletic stations.',
+    startDate: '2026-11-28T08:00:00+05:30',
+    endDate: '2026-11-29T18:00:00+05:30',
+    eventStatus: 'https://schema.org/EventScheduled',
+    eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
+    location: {
+      '@type': 'Place',
+      name: 'Sector 10D Skating Rink',
+      address: {
+        '@type': 'PostalAddress',
+        streetAddress: 'Sector 10D Skating Rink',
+        addressLocality: 'Chandigarh',
+        postalCode: '160011',
+        addressRegion: 'Chandigarh',
+        addressCountry: 'IN',
+      },
+      geo: {
+        '@type': 'GeoCoordinates',
+        latitude: 30.7516,
+        longitude: 76.7975,
+      },
+    },
+    image: [
+      'https://www.fitkidrox.in/img/hero.png',
+      'https://www.fitkidrox.in/img/mini.png',
+      'https://www.fitkidrox.in/img/teens.png',
+      'https://www.fitkidrox.in/img/relay.png',
+    ],
+    organizer: {
+      '@type': 'SportsOrganization',
+      name: 'PSSS (Progressive School Sports Society)',
+      url: 'https://www.fitkidrox.in',
+    },
+    offers: {
+      '@type': 'Offer',
+      name: 'Individual Child Pre-Registration',
+      url: 'https://www.fitkidrox.in/register',
+      price: String(EVENT.entryFee),
+      priceCurrency: 'INR',
+      availability: 'https://schema.org/InStock',
+      validFrom: '2026-01-01',
+      description:
+        'Includes event T-shirt, official race bib, finisher medal and digital certificate',
+    },
+    typicalAgeRange: '3-17',
+    audience: {
+      '@type': 'PeopleAudience',
+      suggestedMinAge: 3,
+      suggestedMaxAge: 17,
+      audienceType: 'Children and Youth Athletes',
+    },
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'SportsOrganization',
+    name: 'FITKIDROX',
+    alternateName: 'FITKIDROX India',
+    url: 'https://www.fitkidrox.in',
+    logo: 'https://www.fitkidrox.in/favicon.svg',
+    description:
+      'FITKIDROX is a premier youth fitness racing movement organized by PSSS to inspire healthy lifestyle, functional fitness, and athletic confidence in kids across India.',
+    address: {
+      '@type': 'PostalAddress',
+      addressLocality: 'Chandigarh',
+      addressRegion: 'Chandigarh',
+      addressCountry: 'IN',
+    },
+    sameAs: [
+      'https://www.instagram.com/fitkidrox',
+      'https://www.facebook.com/fitkidrox',
+    ],
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: FAQS.map((faq) => ({
+      '@type': 'Question',
+      name: faq.q,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: faq.a,
+      },
+    })),
+  },
+]
+
 export const Route = createFileRoute('/')({
+  head: () => ({
+    meta: [
+      {
+        title:
+          'FITKIDROX Chandigarh 2026 — India’s Premier Kids Fitness Challenge',
+      },
+      {
+        name: 'description',
+        content:
+          'Young Minds. Stronger Bodies. Brighter Futures. Join FITKIDROX on 28–29 November 2026 at Sector 10D Skating Rink, Chandigarh. India’s premier youth fitness race for ages 3 to 13+.',
+      },
+      {
+        property: 'og:title',
+        content:
+          'FITKIDROX Chandigarh 2026 — India’s Premier Kids Fitness Challenge',
+      },
+      {
+        property: 'og:description',
+        content:
+          'Supervised, age-appropriate youth fitness race for children aged 3 to 13+. Pre-register now for 28–29 November 2026 at Sector 10D Skating Rink, Chandigarh.',
+      },
+      { property: 'og:url', content: 'https://www.fitkidrox.in/' },
+    ],
+    links: [{ rel: 'canonical', href: 'https://www.fitkidrox.in/' }],
+    scripts: [
+      {
+        type: 'application/ld+json',
+        children: JSON.stringify(homeStructuredData),
+      },
+    ],
+  }),
   component: Home,
 })
 
@@ -110,7 +234,7 @@ function Hero() {
               className="h-12 px-7 text-base font-bold shadow-md shadow-primary/20"
             >
               <Link to="/register">
-                Register interest <ArrowRight />
+                Register your child <ArrowRight />
               </Link>
             </Button>
             <Button
@@ -225,7 +349,7 @@ function About() {
       value: EVENT.targetParticipants.toLocaleString('en-IN'),
       label: 'Participant target',
     },
-    { value: formatINR(EVENT.entryFee), label: 'Proposed entry' },
+    { value: formatINR(EVENT.entryFee), label: 'Entry fee' },
   ]
   return (
     <section className="mx-auto max-w-content px-4 py-20 mt-4 sm:px-6">
@@ -269,8 +393,8 @@ function About() {
         ))}
       </dl>
       <p className="mt-3 text-xs text-muted-foreground">
-        Participant figure is a planning target. Entry fee is proposed and
-        subject to final approval.
+        Participant figure is a planning target. The entry fee is confirmed at{' '}
+        {formatINR(EVENT.entryFee)} per participant.
       </p>
     </section>
   )
@@ -339,7 +463,7 @@ function Categories() {
                 <div className="relative h-52 overflow-hidden">
                   <img
                     src={cdnImage(c.image, 800)}
-                    alt=""
+                    alt={`${c.name} (${c.ages}) · Youth fitness racing category at FITKIDROX Chandigarh`}
                     loading="lazy"
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 motion-reduce:transition-none"
                   />
@@ -403,7 +527,8 @@ function Safety() {
           <p className="mt-6 max-w-md text-muted-foreground leading-relaxed">
             Every activity follows age-appropriate rules with trained
             supervision, first-aid arrangements and parental consent. Our full
-            event safety plan is published before registration opens.
+            event safety plan is published before race day and shared with every
+            registered parent.
           </p>
         </div>
         <ol className="grid gap-4 sm:grid-cols-2">
@@ -503,18 +628,18 @@ function Audiences() {
                 Parents &amp; Guardians
               </Badge>
               <p className="font-display mt-3 text-4xl leading-[0.9] font-black uppercase text-foreground">
-                Pre-register early
+                Register today
               </p>
               <p className="mt-3 text-muted-foreground">
-                Register your interest today. We’ll email you the moment paid
-                registration opens, before public announcement.
+                Registration is open. Complete the form and pay the entry fee to
+                lock in your child’s place for 28–29 November 2026.
               </p>
               <Button
                 asChild
                 className="mt-5 font-bold shadow-sm"
                 size="default"
               >
-                <Link to="/register">Register interest</Link>
+                <Link to="/register">Register your child</Link>
               </Button>
             </div>
           </div>
@@ -527,8 +652,8 @@ function Audiences() {
 const MILESTONES = [
   {
     label: 'Venue confirmation',
-    detail: 'Sector 10D Skating Rink booking and suitability check',
-    status: 'In progress',
+    detail: 'Sector 10D Skating Rink booked and approved for race weekend',
+    status: 'Done',
   },
   {
     label: 'Budget & safety plan',
@@ -546,9 +671,9 @@ const MILESTONES = [
     status: 'Open',
   },
   {
-    label: 'Paid registration opens',
-    detail: 'UPI and card payments with digital receipts',
-    status: 'Upcoming',
+    label: 'Registration open',
+    detail: 'Online entry and payment now live',
+    status: 'Open',
   },
   { label: 'Race weekend', detail: EVENT.dateLabel, status: 'Upcoming' },
 ]
@@ -578,6 +703,8 @@ function RoadToRaceDay() {
                 variant="outline"
                 className={cn(
                   'mt-4 font-semibold text-xs',
+                  m.status === 'Done' &&
+                    'border-emerald-700 bg-emerald-600 text-white',
                   m.status === 'In progress' &&
                     'border-primary/30 bg-primary/10 text-primary',
                   m.status === 'Open' &&

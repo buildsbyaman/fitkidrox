@@ -24,7 +24,7 @@ export function SiteFooter() {
             <li>
               {EVENT.venue}, {EVENT.city}
             </li>
-            <li className="text-slate-500 text-xs">{EVENT.venueStatus}</li>
+            <li className="text-slate-400 text-xs">{EVENT.venueStatus}</li>
           </ul>
         </div>
         <div className="text-sm">
@@ -70,7 +70,7 @@ export function SiteFooter() {
       <div className="border-t border-slate-800/80">
         <p className="mx-auto max-w-content px-4 py-5 text-xs text-slate-500 sm:px-6">
           © 2026 PSSS · FITKIDROX · {EVENT.domain}. Event details, venue and
-          fees are provisional until confirmed.
+          fees are confirmed. Entries are open.
         </p>
       </div>
     </footer>

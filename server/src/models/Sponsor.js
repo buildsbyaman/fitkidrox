@@ -32,10 +32,10 @@ const SponsorSchema = new Schema(
     },
     phone: {
       type: String,
-      required: true,
       trim: true,
+      default: '',
       validate: {
-        validator: isPhone,
+        validator: (v) => !v || isPhone(v),
         message: 'phone must be a 10-digit Indian mobile number.',
       },
     },

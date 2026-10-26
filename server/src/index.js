@@ -4,6 +4,7 @@ import { existsSync } from 'node:fs'
 
 import { createApp } from './app.js'
 import { connectDb } from './db.js'
+import { feeConfigured } from './lib/razorpay.js'
 
 const MONGODB_URI = process.env.MONGODB_URI
 const PORT = Number(process.env.PORT) || 4000
@@ -26,6 +27,17 @@ if (MONGODB_URI.includes('<db_password>')) {
 try {
   await connectDb(MONGODB_URI)
   console.log('Connected to MongoDB.')
+
+  // Ensure all existing verified paid participants have permanent bib numbers assigned
+  const { backfillPaidBibNumbers } = await import('./lib/bib.js')
+  const { Participant } = await import('./models/Participant.js')
+  backfillPaidBibNumbers(Participant)
+    .then((res) => {
+      if (res && res.length > 0) {
+        console.log(`Assigned bib numbers to ${res.length} existing paid participants.`)
+      }
+    })
+    .catch((err) => console.error('Bib backfill error:', err.message))
 } catch (err) {
   console.error('Could not connect to MongoDB:', err.message)
   console.error(
@@ -37,6 +49,12 @@ try {
 if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
   console.warn(
     'ADMIN_EMAIL / ADMIN_PASSWORD are not set — /admin will refuse every login with a 503.',
+  )
+}
+
+if (!feeConfigured()) {
+  console.warn(
+    'ENTRY_FEE_PAISE is missing or invalid — /api/create-order will refuse every order with a 503.',
   )
 }
 

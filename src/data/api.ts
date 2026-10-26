@@ -59,8 +59,86 @@ export interface ParticipantSubmission {
   consentPhotos: boolean
 }
 
-export function submitParticipantInterest(data: ParticipantSubmission) {
+export function submitParticipantRegistration(data: ParticipantSubmission) {
   return post<{ reference: string }>('/api/participants', data)
+}
+
+/** @deprecated Use submitParticipantRegistration. */
+export const submitParticipantInterest = submitParticipantRegistration
+
+export interface RazorpayOrder {
+  order_id: string
+  amount: number
+  currency: string
+  key_id?: string
+}
+
+/** Creates the Razorpay order the checkout modal opens against. */
+export function createRazorpayOrder(amountPaise: number, receipt: string) {
+  return post<RazorpayOrder>('/api/create-order', {
+    amount: amountPaise,
+    currency: 'INR',
+    receipt,
+  })
+}
+
+export interface VerifyPaymentPayload {
+  razorpay_payment_id: string
+  razorpay_order_id: string
+  razorpay_signature: string
+  reference: string
+}
+
+export interface VerifyPaymentResponse {
+  ok: true
+  paymentId: string
+  bibNumber?: number
+  heat?: number
+  course?: 'Course A' | 'Course B'
+  courseCode?: 'A' | 'B'
+  message?: string
+}
+
+/** Server-side HMAC check; resolves only when the signature matches. */
+export function verifyRazorpayPayment(payload: VerifyPaymentPayload) {
+  return post<VerifyPaymentResponse>('/api/verify-payment', payload)
+}
+
+const CHECKOUT_SCRIPT = 'https://checkout.razorpay.com/v1/checkout.js'
+
+/**
+ * Injects Razorpay's checkout script exactly once. Resolves when
+ * `window.Razorpay` is available, rejects if the CDN cannot be reached.
+ */
+export function loadRazorpayCheckout(): Promise<void> {
+  if (typeof window === 'undefined') {
+    return Promise.reject(new Error('Checkout only runs in the browser.'))
+  }
+  if (window.Razorpay) return Promise.resolve()
+
+  return new Promise((resolve, reject) => {
+    const fail = () =>
+      reject(new Error('Could not load the Razorpay checkout.'))
+
+    const existing = document.querySelector<HTMLScriptElement>(
+      `script[src="${CHECKOUT_SCRIPT}"]`,
+    )
+    if (existing) {
+      existing.addEventListener('load', () => resolve())
+      existing.addEventListener('error', fail)
+      return
+    }
+
+    const script = document.createElement('script')
+    script.src = CHECKOUT_SCRIPT
+    script.async = true
+    script.onload = () => resolve()
+    script.onerror = () => {
+      script.remove()
+      fail()
+    }
+    document.body.appendChild(script)
+  })
 }
 
 export interface SchoolRosterEntry {

@@ -1,16 +1,17 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import {
   ArrowLeft,
   ArrowRight,
   Check,
+  CreditCard,
   Loader2,
-  PartyPopper,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Field, fieldAria, PageHero } from '@/components/site/field'
 import { PageShell } from '@/components/site/page-shell'
+import { SuccessConfirmation } from '@/components/site/success-confirmation'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -30,18 +31,75 @@ import {
   ageOnEventDay,
   categoryForAge,
 } from '@/data/fixtures'
-import { submitParticipantInterest } from '@/data/api'
+import {
+  createRazorpayOrder,
+  loadRazorpayCheckout,
+  submitParticipantRegistration,
+  verifyRazorpayPayment,
+  ApiError,
+  type RazorpayOrder,
+} from '@/data/api'
 import { formatINR } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
+const registerStructuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    {
+      '@type': 'ListItem',
+      position: 1,
+      name: 'Home',
+      item: 'https://www.fitkidrox.in/',
+    },
+    {
+      '@type': 'ListItem',
+      position: 2,
+      name: 'Register Child',
+      item: 'https://www.fitkidrox.in/register',
+    },
+  ],
+}
+
 export const Route = createFileRoute('/register')({
   head: () => ({
-    meta: [{ title: 'Register interest · FITKIDROX Chandigarh 2026' }],
+    meta: [
+      {
+        title:
+          'Register Your Child · FITKIDROX Chandigarh 2026 Kids Fitness Race',
+      },
+      {
+        name: 'description',
+        content:
+          'Pre-register your young athlete for FITKIDROX Chandigarh 2026. Ages 3 to 13+. Entry fee includes official event T-shirt, race bib, finisher medal, and digital certificate.',
+      },
+      {
+        property: 'og:title',
+        content:
+          'Register Your Child · FITKIDROX Chandigarh 2026 Kids Fitness Race',
+      },
+      {
+        property: 'og:description',
+        content:
+          'Secure your child’s spot in India’s premier youth fitness event on 28–29 November 2026 at Sector 10D Skating Rink, Chandigarh.',
+      },
+      { property: 'og:url', content: 'https://www.fitkidrox.in/register' },
+    ],
+    links: [{ rel: 'canonical', href: 'https://www.fitkidrox.in/register' }],
+    scripts: [
+      {
+        type: 'application/ld+json',
+        children: JSON.stringify(registerStructuredData),
+      },
+    ],
   }),
   component: RegisterPage,
 })
 
-const STEPS = ['Participant', 'Parent & consent', 'Review'] as const
+const STEPS = ['Participant', 'Parent & consent', 'Review', 'Payment'] as const
+
+/** Matches --primary in styles.css — Razorpay wants a plain hex. */
+const BRAND_COLOR = '#f6641b'
 
 interface FormState {
   childName: string
@@ -85,7 +143,8 @@ function validate(step: number, f: FormState): Errors {
     const age = f.dob ? ageOnEventDay(f.dob) : null
     if (age === null) e.dob = 'Enter a date of birth.'
     else if (age < 3)
-      e.dob = 'Participants must be at least 3 years old on 28 Nov 2026.'
+      e.dob =
+        'Participants must be at least 3 years old on event day (born on or before 28 Nov 2023).'
     else if (age > 18) e.dob = 'FITKIDROX is for participants up to 18 years.'
     if (!f.gender) e.gender = 'Choose one.'
     if (!f.tshirt) e.tshirt = 'Choose a T-shirt size.'
@@ -95,7 +154,7 @@ function validate(step: number, f: FormState): Errors {
       e.guardianName = 'Enter your full name.'
     if (!/^(\+91[\s-]?)?[6-9]\d{9}$/.test(f.guardianPhone.replace(/\s/g, '')))
       e.guardianPhone = 'Enter a 10-digit Indian mobile number.'
-    if (!/^\S+@\S+\.\S+$/.test(f.guardianEmail))
+    if (!/^[A-Za-z0-9_%+-]+(\.[A-Za-z0-9_%+-]+)*@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/.test(f.guardianEmail))
       e.guardianEmail = 'Enter a valid email.'
     if (!f.consentParticipation)
       e.consentParticipation = 'Consent is required to take part.'
@@ -111,12 +170,37 @@ function RegisterPage() {
   const [errors, setErrors] = useState<Errors>({})
   const [submitting, setSubmitting] = useState(false)
   const [reference, setReference] = useState<string | null>(null)
+  const [bibInfo, setBibInfo] = useState<{
+    bibNumber?: number
+    heat?: number
+    course?: 'Course A' | 'Course B'
+  } | null>(null)
+  // Set once the participant exists so a cancelled payment doesn't create a
+  // duplicate record on retry — the retry pays against the same reference.
+  const [createdReference, setCreatedReference] = useState<string | null>(null)
 
   const age = form.dob ? ageOnEventDay(form.dob) : null
   const category = age !== null ? categoryForAge(age) : null
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }))
+    if (key === 'dob' && typeof value === 'string' && value) {
+      const calculatedAge = ageOnEventDay(value)
+      if (calculatedAge !== null && calculatedAge < 3) {
+        setErrors((e) => ({
+          ...e,
+          dob: 'Participants must be at least 3 years old on event day (born on or before 28 Nov 2023).',
+        }))
+        return
+      }
+      if (calculatedAge !== null && calculatedAge > 18) {
+        setErrors((e) => ({
+          ...e,
+          dob: 'FITKIDROX is for participants up to 18 years old.',
+        }))
+        return
+      }
+    }
     if (errors[key]) setErrors((e) => ({ ...e, [key]: undefined }))
   }
 
@@ -129,76 +213,189 @@ function RegisterPage() {
     }
   }
 
-  async function submit() {
+  /**
+   * Step 4: save the participant (once), create the Razorpay order, then
+   * open the checkout modal. `submitting` stays true while the modal is
+   * open so a second click can't create a duplicate registration.
+   */
+  async function pay() {
     setSubmitting(true)
-    try {
-      const res = await submitParticipantInterest({
-        ...form,
-        category: category?.name ?? '',
-      })
-      setReference(res.reference)
-    } catch {
-      toast.error('We couldn’t save your registration. Please try again.')
-    } finally {
-      setSubmitting(false)
+
+    let reference = createdReference
+    if (!reference) {
+      try {
+        const res = await submitParticipantRegistration({
+          ...form,
+          category: category?.name ?? '',
+        })
+        reference = res.reference
+        setCreatedReference(res.reference)
+      } catch (err) {
+        toast.error(
+          err instanceof ApiError
+            ? err.message
+            : 'We couldn’t save your registration. Please try again.',
+        )
+        setSubmitting(false)
+        return
+      }
     }
+
+    try {
+      await loadRazorpayCheckout()
+    } catch {
+      toast.error(
+        'The payment window could not be loaded. Check your connection and try again.',
+      )
+      setSubmitting(false)
+      return
+    }
+
+    let order: RazorpayOrder
+    try {
+      order = await createRazorpayOrder(EVENT.entryFee * 100, reference)
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError
+          ? err.message
+          : 'We couldn’t start the payment. Please try again.',
+      )
+      setSubmitting(false)
+      return
+    }
+
+    openCheckout(order, reference)
+  }
+
+  /** Opens Razorpay Standard Checkout and resolves the flow when it settles. */
+  function openCheckout(order: RazorpayOrder, reference: string) {
+    let settled = false
+    let failed = false
+
+    const settle = () => {
+      if (!settled) {
+        settled = true
+        setSubmitting(false)
+      }
+    }
+
+    const rzp = new window.Razorpay({
+      key: order.key_id || import.meta.env.VITE_RAZORPAY_KEY_ID,
+      amount: order.amount,
+      currency: order.currency,
+      name: 'FITKIDROX',
+      description: `Entry fee · ${form.childName} · ${category?.name ?? ''}`,
+      order_id: order.order_id,
+      prefill: {
+        name: form.guardianName,
+        email: form.guardianEmail,
+        contact: form.guardianPhone,
+      },
+      theme: { color: BRAND_COLOR },
+      handler: async (payment) => {
+        try {
+          const verified = await verifyRazorpayPayment({
+            ...payment,
+            reference,
+          })
+          if (verified.bibNumber) {
+            setBibInfo({
+              bibNumber: verified.bibNumber,
+              heat: verified.heat,
+              course: verified.course,
+            })
+          }
+          setReference(reference)
+          window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+          toast.success('Payment successful', {
+            description: `${formatINR(EVENT.entryFee)} paid · ${
+              verified.bibNumber ? `Assigned Bib #${verified.bibNumber}` : 'Registration confirmed'
+            }`,
+          })
+        } catch {
+          toast.error(
+            `Your payment could not be verified, so the place is not confirmed. Please contact ${EVENT.email} for assistance.`,
+          )
+        } finally {
+          settle()
+        }
+      },
+      modal: {
+        ondismiss: () => {
+          if (!settled && !failed) {
+            toast.warning(
+              'Payment cancelled. Your details are saved — press Complete payment to try again.',
+            )
+          }
+          settle()
+        },
+      },
+    })
+
+    rzp.on('payment.failed', (failure) => {
+      failed = true
+      toast.error(
+        failure.error?.description
+          ? `Payment failed — ${failure.error.description}`
+          : 'Payment failed. Please try again with another method.',
+      )
+      settle()
+    })
+
+    rzp.open()
   }
 
   if (reference) {
+    const childFirst = form.childName.trim()
+      ? form.childName.trim().split(' ')[0]
+      : 'Athlete'
     return (
-      <PageShell>
-        <section className="track-lines">
-          <div className="mx-auto max-w-reading px-4 py-24 text-center sm:px-6">
-            <PartyPopper className="mx-auto size-12 text-primary" />
-            <h1 className="font-display mt-6 text-6xl leading-[0.9] font-black uppercase">
-              You’re on the list, {form.childName.split(' ')[0]}!
-            </h1>
-            <p className="mt-4 text-lg text-muted-foreground">
-              We’ve saved your interest for{' '}
-              <strong className="text-foreground">{category?.name}</strong>.
-              We’ll email {form.guardianEmail} as soon as paid registration
-              opens.
-            </p>
-            <div className="mx-auto mt-8 inline-block rounded-2xl border border-border/80 bg-card px-8 py-5 shadow-sm">
-              <p className="text-xs font-bold tracking-widest text-muted-foreground uppercase">
-                Reference Code
-              </p>
-              <p className="font-display text-4xl font-black tracking-wider text-primary">
-                {reference}
-              </p>
-            </div>
-            <div className="mt-10 flex flex-wrap justify-center gap-3">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setForm({
-                    ...EMPTY,
-                    guardianName: form.guardianName,
-                    guardianPhone: form.guardianPhone,
-                    guardianEmail: form.guardianEmail,
-                    relation: form.relation,
-                  })
-                  setReference(null)
-                  setStep(0)
-                }}
-              >
-                Add a sibling
-              </Button>
-              <Button asChild>
-                <Link to="/">Back to home</Link>
-              </Button>
-            </div>
-          </div>
-        </section>
-      </PageShell>
+      <SuccessConfirmation
+        eyebrow="Registration Confirmed"
+        title={`Registration confirmed, ${childFirst}!`}
+        description={
+          <>
+            {form.childName.trim() ? `${childFirst}’s` : 'Your child’s'} spot in{' '}
+            <strong className="text-foreground">{category?.name}</strong> is
+            officially confirmed! We have sent a confirmation email to{' '}
+            <strong className="text-foreground">{form.guardianEmail}</strong>.
+            Please present your Bib Number at the athlete check-in desk on
+            race day.
+          </>
+        }
+        reference={reference}
+        bibNumber={bibInfo?.bibNumber}
+        heat={bibInfo?.heat}
+        course={bibInfo?.course}
+        referenceSubtext={`${formatINR(EVENT.entryFee)} paid · Finisher kit reserved`}
+        recipientEmail={form.guardianEmail}
+        secondaryAction={{
+          label: 'Add a sibling / child',
+          onClick: () => {
+            setForm({
+              ...EMPTY,
+              guardianName: form.guardianName,
+              guardianPhone: form.guardianPhone,
+              guardianEmail: form.guardianEmail,
+              relation: form.relation,
+            })
+            setReference(null)
+            setCreatedReference(null)
+            setBibInfo(null)
+            setStep(0)
+            window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
+          },
+        }}
+      />
     )
   }
 
   return (
     <PageShell>
-      <PageHero eyebrow={EVENT.dateLabel} title="Register your interest">
-        Paid registration opens once the venue and fees are confirmed.
-        Pre-register now to secure early access for your child.
+      <PageHero eyebrow={EVENT.dateLabel} title="Register your child">
+        Registration is open for 28–29 November 2026. Fill in the details, pay
+        the {formatINR(EVENT.entryFee)} entry fee and your child’s place is
+        confirmed.
       </PageHero>
 
       <div className="mx-auto grid max-w-content gap-10 px-4 py-12 sm:px-6 lg:grid-cols-[1fr_20rem]">
@@ -236,33 +433,42 @@ function RegisterPage() {
                     max="2023-11-28"
                   />
                 </Field>
-                <div className="grid gap-2">
-                  <span className="text-sm font-semibold">Category</span>
+                <Field
+                  id="category"
+                  label="Category"
+                  hint="Auto-selected based on age on event day."
+                >
                   <div
+                    id="category"
                     className={cn(
-                      'flex min-h-9 items-center rounded-md border border-dashed px-3 text-sm transition-colors',
-                      category &&
-                        'border-solid border-primary/50 bg-primary/10 text-primary font-bold',
+                      'flex h-9 items-center rounded-md border border-input px-3 text-sm transition-colors',
+                      age !== null && age < 3
+                        ? 'border-destructive/40 bg-destructive/5 text-destructive font-medium'
+                        : category
+                          ? 'bg-muted/30 text-foreground font-medium'
+                          : 'bg-muted/30 text-muted-foreground',
                     )}
                     aria-live="polite"
                   >
-                    {category
-                      ? `${category.name} · ${category.ages}`
-                      : 'Auto-selected from date of birth'}
+                    {age !== null && age < 3
+                      ? 'Not eligible · Minimum age is 3 years'
+                      : category
+                        ? `${category.name} · ${category.ages}`
+                        : 'Auto-selected from date of birth'}
                   </div>
-                </div>
+                </Field>
                 <Field id="gender" label="Gender" error={errors.gender}>
                   <RadioGroup
                     id="gender"
                     value={form.gender}
                     onValueChange={(v) => set('gender', v)}
-                    className="flex gap-5 pt-1"
+                    className="flex h-9 items-center gap-6"
                     aria-invalid={errors.gender ? true : undefined}
                   >
                     {['Girl', 'Boy', 'Other'].map((g) => (
                       <label
                         key={g}
-                        className="flex items-center gap-2 text-sm"
+                        className="flex cursor-pointer items-center gap-2 text-sm"
                       >
                         <RadioGroupItem value={g} /> {g}
                       </label>
@@ -437,13 +643,58 @@ function RegisterPage() {
                 </dl>
                 <Alert className="border-primary/40 bg-primary/5">
                   <AlertTitle className="font-bold">
-                    No payment today
+                    Check the details before you pay
                   </AlertTitle>
                   <AlertDescription>
-                    This is a pre-registration. When paid registration opens
-                    you’ll receive a link to pay the entry fee (proposed{' '}
-                    {formatINR(EVENT.entryFee)}) by UPI or card and get a
-                    digital receipt.
+                    Nothing is charged yet. On the next step you’ll pay the{' '}
+                    {formatINR(EVENT.entryFee)} entry fee by UPI or card, and
+                    your child’s place is confirmed the moment it succeeds.
+                  </AlertDescription>
+                </Alert>
+              </div>
+            )}
+
+            {step === 3 && (
+              <div className="grid gap-6">
+                <div className="rounded-xl border border-border/80 bg-muted/60 p-6">
+                  <p className="text-xs font-bold tracking-widest text-muted-foreground uppercase">
+                    Amount due
+                  </p>
+                  <p className="font-display mt-1 text-5xl font-black text-foreground">
+                    {formatINR(EVENT.entryFee)}
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Entry for {form.childName} · {category?.name ?? 'FITKIDROX'}{' '}
+                    · {EVENT.dateLabel}
+                  </p>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border border-primary/40 bg-primary/5 p-4">
+                    <p className="flex items-center gap-2 text-sm font-bold text-foreground">
+                      <CreditCard className="size-4 text-primary" /> UPI or card
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Pay securely — your place is confirmed instantly.
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-border/80 bg-card p-4">
+                    <p className="flex items-center gap-2 text-sm font-bold text-foreground">
+                      <Check className="size-4 text-primary" /> What’s included
+                    </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      T-shirt, race bib, finisher medal and digital certificate.
+                    </p>
+                  </div>
+                </div>
+
+                <Alert>
+                  <AlertTitle className="font-bold">
+                    One confirmation email
+                  </AlertTitle>
+                  <AlertDescription>
+                    A receipt and your assigned Bib Number are emailed to{' '}
+                    {form.guardianEmail} as soon as the payment completes.
                   </AlertDescription>
                 </Alert>
               </div>
@@ -453,32 +704,36 @@ function RegisterPage() {
               {step > 0 ? (
                 <Button
                   variant="ghost"
+                  // Once the server has a record, editing the form would leave
+                  // the payment crediting a stale copy — freeze navigation.
                   onClick={() => setStep((s) => s - 1)}
-                  disabled={submitting}
+                  disabled={submitting || createdReference !== null}
                 >
                   <ArrowLeft /> Back
                 </Button>
               ) : (
                 <span />
               )}
-              {step < 2 ? (
+              {step < 3 ? (
                 <Button onClick={next} size="lg" className="font-bold">
-                  Continue <ArrowRight />
+                  {step === 2 ? 'Continue to payment' : 'Continue'}{' '}
+                  <ArrowRight />
                 </Button>
               ) : (
                 <Button
-                  onClick={submit}
+                  onClick={pay}
                   size="lg"
                   className="font-bold"
                   disabled={submitting}
                 >
                   {submitting ? (
                     <>
-                      <Loader2 className="animate-spin" /> Saving…
+                      <Loader2 className="animate-spin" /> Processing payment…
                     </>
                   ) : (
                     <>
-                      Confirm pre-registration <Check />
+                      <CreditCard /> Complete payment{' '}
+                      {formatINR(EVENT.entryFee)}
                     </>
                   )}
                 </Button>
@@ -492,13 +747,19 @@ function RegisterPage() {
             Your entry
           </p>
           <p className="font-display mt-2 text-3xl font-black uppercase text-foreground">
-            {category?.name ?? 'Choose a date of birth'}
+            {age !== null && age < 3
+              ? 'Not eligible'
+              : (category?.name ?? 'Choose a date of birth')}
           </p>
-          {category && (
+          {age !== null && age < 3 ? (
+            <p className="mt-1 text-sm text-destructive font-medium">
+              Must be at least 3 years on race day
+            </p>
+          ) : category ? (
             <p className="mt-1 text-sm text-muted-foreground">
               {category.format}
             </p>
-          )}
+          ) : null}
           <ul className="mt-6 space-y-2.5 border-t border-border/70 pt-5 text-sm text-foreground/85">
             {[
               'Event T-shirt & race bib',
@@ -515,9 +776,7 @@ function RegisterPage() {
             ))}
           </ul>
           <div className="mt-6 flex items-baseline justify-between border-t border-border/70 pt-5">
-            <span className="text-sm text-muted-foreground">
-              Proposed entry
-            </span>
+            <span className="text-sm text-muted-foreground">Entry fee</span>
             <span className="font-display text-3xl font-black text-primary">
               {formatINR(EVENT.entryFee)}
             </span>

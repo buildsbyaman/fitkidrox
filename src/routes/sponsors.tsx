@@ -3,7 +3,6 @@ import { useState } from 'react'
 import {
   Award,
   Check,
-  CheckCircle2,
   Loader2,
   Mail,
   Send,
@@ -14,6 +13,7 @@ import { toast } from 'sonner'
 
 import { Field, fieldAria, PageHero } from '@/components/site/field'
 import { PageShell } from '@/components/site/page-shell'
+import { SuccessConfirmation } from '@/components/site/success-confirmation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,8 +22,57 @@ import { EVENT, SPONSOR_PACKAGES } from '@/data/fixtures'
 import { submitSponsorEnquiry } from '@/data/api'
 import { cn } from '@/lib/utils'
 
+const sponsorsStructuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    {
+      '@type': 'ListItem',
+      position: 1,
+      name: 'Home',
+      item: 'https://www.fitkidrox.in/',
+    },
+    {
+      '@type': 'ListItem',
+      position: 2,
+      name: 'Sponsor Opportunities',
+      item: 'https://www.fitkidrox.in/sponsors',
+    },
+  ],
+}
+
 export const Route = createFileRoute('/sponsors')({
-  head: () => ({ meta: [{ title: 'Sponsor FITKIDROX · Chandigarh 2026' }] }),
+  head: () => ({
+    meta: [
+      {
+        title:
+          'Sponsor FITKIDROX 2026 · Youth Sports & Brand Partnership Opportunities',
+      },
+      {
+        name: 'description',
+        content:
+          'Partner with FITKIDROX Chandigarh 2026. Connect your brand with 1,000+ junior athletes, 25+ partner schools, and thousands of health-focused families across the Tri-City.',
+      },
+      {
+        property: 'og:title',
+        content:
+          'Sponsor FITKIDROX 2026 · Youth Sports & Brand Partnership Opportunities',
+      },
+      {
+        property: 'og:description',
+        content:
+          'Explore Title, Category, Hydration, Finish Line & Equipment sponsorship packages for India’s premier youth fitness challenge.',
+      },
+      { property: 'og:url', content: 'https://www.fitkidrox.in/sponsors' },
+    ],
+    links: [{ rel: 'canonical', href: 'https://www.fitkidrox.in/sponsors' }],
+    scripts: [
+      {
+        type: 'application/ld+json',
+        children: JSON.stringify(sponsorsStructuredData),
+      },
+    ],
+  }),
   component: SponsorsPage,
 })
 
@@ -35,7 +84,13 @@ function SponsorsPage() {
   const [form, setForm] = useState<Form>(EMPTY)
   const [errors, setErrors] = useState<Partial<Form>>({})
   const [submitting, setSubmitting] = useState(false)
-  const [sent, setSent] = useState<string | null>(null)
+  const [submitted, setSubmitted] = useState<{
+    reference: string
+    company: string
+    contact: string
+    email: string
+    packageName: string
+  } | null>(null)
 
   function set(key: keyof Form, value: string) {
     setForm((f) => ({ ...f, [key]: value }))
@@ -50,33 +105,79 @@ function SponsorsPage() {
     }
   }
 
+  const selected = SPONSOR_PACKAGES.find((p) => p.id === packageId)
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     const errs: Partial<Form> = {}
     if (form.company.trim().length < 2)
       errs.company = 'Enter your company or brand name.'
     if (form.contact.trim().length < 2) errs.contact = 'Enter a contact name.'
-    if (!/^\S+@\S+\.\S+$/.test(form.email))
+    if (!/^[A-Za-z0-9_%+-]+(\.[A-Za-z0-9_%+-]+)*@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/.test(form.email))
       errs.email = 'Enter a valid email address.'
+    if (
+      form.phone.trim() &&
+      !/^(\+91[\s-]?)?[6-9]\d{9}$/.test(form.phone.replace(/\s/g, ''))
+    ) {
+      errs.phone = 'Enter a valid 10-digit mobile number.'
+    }
     setErrors(errs)
     if (Object.keys(errs).length) return
 
     setSubmitting(true)
     try {
       const res = await submitSponsorEnquiry({ ...form, packageId })
-      setSent(res.reference)
-      setForm(EMPTY)
+      setSubmitted({
+        reference: res.reference,
+        company: form.company.trim(),
+        contact: form.contact.trim(),
+        email: form.email.trim(),
+        packageName: selected?.name ?? 'Sponsorship',
+      })
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
       toast.success('Enquiry submitted successfully', {
         description: `Reference code: ${res.reference}`,
       })
-    } catch {
-      toast.error('We couldn’t send your enquiry. Please try again.')
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : 'We couldn’t send your enquiry. Please try again.'
+      toast.error(msg)
     } finally {
       setSubmitting(false)
     }
   }
 
-  const selected = SPONSOR_PACKAGES.find((p) => p.id === packageId)
+  if (submitted) {
+    return (
+      <SuccessConfirmation
+        eyebrow="Partnership Enquiry Received"
+        title={`Thank you, ${submitted.company}!`}
+        description={
+          <>
+            We have received your sponsorship enquiry for the{' '}
+            <strong className="text-foreground">{submitted.packageName}</strong>{' '}
+            tier. Our brand partnerships team will review your requirements and
+            contact{' '}
+            <strong className="text-foreground">{submitted.contact}</strong> within
+            two working days.
+          </>
+        }
+        reference={submitted.reference}
+        referenceSubtext={`${submitted.packageName} · Priority Review`}
+        recipientEmail={submitted.email}
+        secondaryAction={{
+          label: 'Send another enquiry',
+          onClick: () => {
+            setSubmitted(null)
+            setForm(EMPTY)
+            window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
+          },
+        }}
+      />
+    )
+  }
 
   return (
     <PageShell>
@@ -276,35 +377,8 @@ function SponsorsPage() {
                 </p>
               </div>
 
-              {sent ? (
-                <div
-                  className="rounded-2xl bg-primary/5 border border-primary/20 p-6 text-foreground text-center"
-                  role="status"
-                >
-                  <CheckCircle2 className="size-10 text-primary mx-auto mb-3" />
-                  <p className="font-display text-2xl font-black uppercase">
-                    Thank you, enquiry received!
-                  </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Reference{' '}
-                    <strong className="font-mono text-foreground">
-                      {sent}
-                    </strong>
-                    . Our partnerships liaison will review your brand's
-                    requirements and respond within two working days.
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="mt-6"
-                    onClick={() => setSent(null)}
-                  >
-                    Send another enquiry
-                  </Button>
-                </div>
-              ) : (
-                <form onSubmit={submit} noValidate className="space-y-4">
-                  <Field
+              <form onSubmit={submit} noValidate className="space-y-4">
+                <Field
                     id="company"
                     label="Company / Brand name"
                     error={errors.company}
@@ -332,9 +406,13 @@ function SponsorsPage() {
                         autoComplete="name"
                       />
                     </Field>
-                    <Field id="sp-phone" label="Phone (optional)">
+                    <Field
+                      id="sp-phone"
+                      label="Phone (optional)"
+                      error={errors.phone}
+                    >
                       <Input
-                        id="sp-phone"
+                        {...fieldAria('sp-phone', errors.phone)}
                         type="tel"
                         value={form.phone}
                         onChange={(e) => set('phone', e.target.value)}
@@ -391,7 +469,6 @@ function SponsorsPage() {
                     enquiry.
                   </p>
                 </form>
-              )}
             </div>
           </div>
         </div>

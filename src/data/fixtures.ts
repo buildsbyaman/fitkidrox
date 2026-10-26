@@ -14,10 +14,11 @@ export const EVENT = {
   days: 'Two days · Saturday & Sunday',
   venue: 'Sector 10D Skating Rink',
   city: 'Chandigarh',
-  venueStatus: 'Venue booking and suitability to be confirmed',
+  venueStatus: 'Venue confirmed · Sector 10D Skating Rink',
   targetParticipants: 1000,
-  entryFee: 750,
-  feeStatus: 'Proposed fee, subject to final approval',
+  entryFee: 1250,
+  feeStatus:
+    'Entry fee includes T-shirt, race bib, finisher medal & certificate',
   domain: 'www.fitkidrox.in',
   email: 'hello@fitkidrox.in',
 } as const
@@ -193,7 +194,11 @@ export const SPONSOR_PACKAGES: SponsorPackage[] = [
 export const FAQS = [
   {
     q: 'Is registration open?',
-    a: 'Not yet. Paid registration opens once the venue, safety plan and entry fee are confirmed. Register your interest now and you will be first to know.',
+    a: 'Yes — registration is open. Enter your child’s details and pay the ₹1,250 entry fee online to confirm their place; you will receive a reference code instantly.',
+  },
+  {
+    q: 'How do I pay?',
+    a: 'By UPI or card at the end of the registration form. Your child’s place is confirmed the moment the payment succeeds, and the reference code doubles as your receipt.',
   },
   {
     q: 'How is my child’s category decided?',
@@ -205,7 +210,7 @@ export const FAQS = [
   },
   {
     q: 'What does the entry fee include?',
-    a: 'The proposed ₹750 entry includes an event T-shirt, race bib, finisher medal and a digital certificate.',
+    a: 'The ₹1,250 entry includes an event T-shirt, race bib, finisher medal and a digital certificate.',
   },
   {
     q: 'Can parents stay with their child?',

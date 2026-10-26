@@ -1,10 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
-import { CheckCircle2, Loader2, Users } from 'lucide-react'
+import { Loader2, Users } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Field, fieldAria, PageHero } from '@/components/site/field'
 import { PageShell } from '@/components/site/page-shell'
+import { SuccessConfirmation } from '@/components/site/success-confirmation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -18,9 +19,54 @@ import { EVENT } from '@/data/fixtures'
 import { submitSchoolEntry } from '@/data/api'
 import { formatINR } from '@/lib/format'
 
+const schoolsStructuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    {
+      '@type': 'ListItem',
+      position: 1,
+      name: 'Home',
+      item: 'https://www.fitkidrox.in/',
+    },
+    {
+      '@type': 'ListItem',
+      position: 2,
+      name: 'School Entries',
+      item: 'https://www.fitkidrox.in/schools',
+    },
+  ],
+}
+
 export const Route = createFileRoute('/schools')({
   head: () => ({
-    meta: [{ title: 'School entries · FITKIDROX Chandigarh 2026' }],
+    meta: [
+      {
+        title: 'School Entries & Partnerships · FITKIDROX Chandigarh 2026',
+      },
+      {
+        name: 'description',
+        content:
+          'Register your school team for FITKIDROX Chandigarh 2026. Inter-school youth fitness competition across Chandigarh, Mohali & Panchkula with dedicated school leaderboards and bulk entry.',
+      },
+      {
+        property: 'og:title',
+        content: 'School Entries & Partnerships · FITKIDROX Chandigarh 2026',
+      },
+      {
+        property: 'og:description',
+        content:
+          'Empower your students with fitness, teamwork, and athletic confidence. Register school delegations for FITKIDROX 2026.',
+      },
+      { property: 'og:url', content: 'https://www.fitkidrox.in/schools' },
+    ],
+    links: [{ rel: 'canonical', href: 'https://www.fitkidrox.in/schools' }],
+    scripts: [
+      {
+        type: 'application/ld+json',
+        children: JSON.stringify(schoolsStructuredData),
+      },
+    ],
   }),
   component: SchoolsPage,
 })
@@ -64,7 +110,7 @@ function SchoolsPage() {
       e.coordinator = 'Enter the coordinator’s name.'
     if (!/^(\+91[\s-]?)?[6-9]\d{9}$/.test(school.phone.replace(/\s/g, '')))
       e.phone = 'Enter a valid 10-digit mobile number.'
-    if (!/^\S+@\S+\.\S+$/.test(school.email))
+    if (!/^[A-Za-z0-9_%+-]+(\.[A-Za-z0-9_%+-]+)*@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/.test(school.email))
       e.email = 'Enter a valid email address.'
     if (!school.participants || approxCount < 1)
       e.participants =
@@ -85,6 +131,7 @@ function SchoolsPage() {
         roster: [],
       })
       setReference(res.reference)
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
       toast.success('School request submitted successfully', {
         description: `Reference: ${res.reference}`,
       })
@@ -97,51 +144,38 @@ function SchoolsPage() {
 
   if (reference) {
     return (
-      <PageShell>
-        <section className="track-lines">
-          <div className="mx-auto max-w-reading px-4 py-24 text-center sm:px-6">
-            <CheckCircle2 className="mx-auto size-12 text-primary" />
-            <h1 className="font-display mt-6 text-6xl leading-[0.9] font-black uppercase">
-              {school.schoolName} is registered!
-            </h1>
-            <p className="mt-4 text-lg text-muted-foreground">
-              Thank you! We have received your request for approximately{' '}
-              <strong className="text-foreground">
-                {approxCount} students
-              </strong>
-              . Our school partnerships team will contact {school.coordinator}{' '}
-              within two working days with event slots and coordinator
-              credentials.
-            </p>
-            <div className="mt-8 rounded-xl border bg-card p-6 inline-block">
-              <span className="text-xs uppercase tracking-wider text-muted-foreground font-semibold">
-                Reference Code
-              </span>
-              <p className="font-display mt-1 text-4xl font-black tracking-wider text-primary">
-                {reference}
-              </p>
-            </div>
-            <div className="mt-8">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setReference(null)
-                  setSchool({
-                    schoolName: '',
-                    city: 'Chandigarh',
-                    coordinator: '',
-                    phone: '',
-                    email: '',
-                    participants: '',
-                  })
-                }}
-              >
-                Submit another school request
-              </Button>
-            </div>
-          </div>
-        </section>
-      </PageShell>
+      <SuccessConfirmation
+        eyebrow="School Entry Received"
+        title={`${school.schoolName} is registered!`}
+        description={
+          <>
+            Thank you! We have received your participation request for approximately{' '}
+            <strong className="text-foreground">{approxCount} students</strong>.
+            Our school partnerships team will contact{' '}
+            <strong className="text-foreground">{school.coordinator}</strong> within
+            two working days with event slots, parent consent packets, and coordinator
+            credentials.
+          </>
+        }
+        reference={reference}
+        referenceSubtext={`~${approxCount} students · City: ${school.city}`}
+        recipientEmail={school.email}
+        secondaryAction={{
+          label: 'Submit another school',
+          onClick: () => {
+            setReference(null)
+            setSchool({
+              schoolName: '',
+              city: 'Chandigarh',
+              coordinator: '',
+              phone: '',
+              email: '',
+              participants: '',
+            })
+            window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
+          },
+        }}
+      />
     )
   }
 

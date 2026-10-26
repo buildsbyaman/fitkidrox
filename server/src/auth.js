@@ -156,7 +156,7 @@ function clientIp(req) {
   return req.ip || req.socket?.remoteAddress || 'unknown'
 }
 
-export function rateLimitExceeded(req) {
+export function rateLimitExceeded(req, res) {
   const now = Date.now()
   const ip = clientIp(req)
   const entry = attempts.get(ip)
@@ -167,6 +167,13 @@ export function rateLimitExceeded(req) {
   }
 
   entry.count += 1
+  if (entry.count > MAX_ATTEMPTS && res) {
+    res.setHeader(
+      'Retry-After',
+      String(Math.max(1, Math.ceil((entry.resetAt - now) / 1000))),
+    )
+    return true
+  }
   return entry.count > MAX_ATTEMPTS
 }
 
@@ -182,3 +189,44 @@ setInterval(() => {
     if (entry.resetAt <= now) attempts.delete(ip)
   }
 }, WINDOW_MS).unref()
+
+/**
+ * General IP-based in-memory rate limiter middleware factory for public endpoints.
+ */
+export function createRateLimiter({
+  windowMs = 10 * 60 * 1000,
+  maxRequests = 30,
+  message = 'Too many requests. Please try again later.',
+} = {}) {
+  const hits = new Map()
+
+  setInterval(() => {
+    const now = Date.now()
+    for (const [ip, entry] of hits) {
+      if (entry.resetAt <= now) hits.delete(ip)
+    }
+  }, windowMs).unref()
+
+  return (req, res, next) => {
+    const ip = clientIp(req)
+    const now = Date.now()
+    const entry = hits.get(ip)
+
+    if (!entry || entry.resetAt <= now) {
+      hits.set(ip, { count: 1, resetAt: now + windowMs })
+      return next()
+    }
+
+    entry.count += 1
+    if (entry.count > maxRequests) {
+      // Tell clients when to come back instead of leaving them guessing.
+      res.setHeader(
+        'Retry-After',
+        String(Math.max(1, Math.ceil((entry.resetAt - now) / 1000))),
+      )
+      return res.status(429).json({ error: message })
+    }
+
+    next()
+  }
+}

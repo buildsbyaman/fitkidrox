@@ -69,7 +69,7 @@ export function SiteHeader() {
 
         <div className="flex items-center gap-2">
           <Button asChild className="hidden font-bold sm:inline-flex">
-            <Link to="/register">Register interest</Link>
+            <Link to="/register">Register your child</Link>
           </Button>
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
@@ -115,7 +115,7 @@ export function SiteHeader() {
                   className="mt-6 font-bold shadow-md shadow-primary/20"
                 >
                   <Link to="/register" onClick={() => setOpen(false)}>
-                    Register interest
+                    Register your child
                   </Link>
                 </Button>
               </nav>
