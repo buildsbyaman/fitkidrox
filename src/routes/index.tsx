@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 
 import { PageShell } from '@/components/site/page-shell'
+import { WhatsAppIcon, WHATSAPP_ENQUIRY_URL } from '@/components/site/whatsapp-icon'
 import {
   Accordion,
   AccordionContent,
@@ -30,7 +31,6 @@ import {
   SAFETY_POINTS,
   categoryForAge,
 } from '@/data/fixtures'
-import { formatINR } from '@/lib/format'
 import { cdnImage } from '@/lib/image'
 import { cn } from '@/lib/utils'
 
@@ -342,14 +342,19 @@ function Marquee() {
 }
 
 function About() {
+  const totalStations = CATEGORIES.reduce(
+    (acc, cat) => acc + cat.stations.length,
+    0,
+  )
+
   const stats = [
     { value: '2', label: 'Event days' },
     { value: '4', label: 'Age categories' },
     {
       value: EVENT.targetParticipants.toLocaleString('en-IN'),
-      label: 'Participant target',
+      label: 'Participants',
     },
-    { value: formatINR(EVENT.entryFee), label: 'Entry fee' },
+    { value: String(totalStations), label: 'Fitness stations' },
   ]
   return (
     <section className="mx-auto max-w-content px-4 py-20 mt-4 sm:px-6">
@@ -393,109 +398,141 @@ function About() {
         ))}
       </dl>
       <p className="mt-3 text-xs text-muted-foreground">
-        Participant figure is a planning target. The entry fee is confirmed at{' '}
-        {formatINR(EVENT.entryFee)} per participant.
+        Participant figure is a planning target. Every category features 4
+        age-adapted stations with dedicated coach supervision.
       </p>
     </section>
   )
 }
 
+const QUICK_AGES = [
+  { label: '3–5 yrs', age: 4, categoryId: 'mini' },
+  { label: '6–8 yrs', age: 8, categoryId: 'kids' },
+  { label: '9–12 yrs', age: 11, categoryId: 'athletic' },
+  { label: '13+ yrs', age: 14, categoryId: 'performance' },
+]
+
 function Categories() {
   const [age, setAge] = useState(8)
   const match = categoryForAge(age)
+
   return (
     <section
       id="categories"
-      className="track-lines scroll-mt-16 border-y border-border/70 py-24"
+      className="track-lines scroll-mt-16 border-y border-border/70 py-16"
     >
       <div className="mx-auto max-w-content px-4 sm:px-6">
-        <div className="flex flex-col justify-between gap-8 lg:flex-row lg:items-end">
+        <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
           <div>
-            <p className="text-sm font-bold tracking-[0.25em] text-primary uppercase">
+            <p className="text-xs sm:text-sm font-bold tracking-[0.25em] text-primary uppercase">
               Four categories
             </p>
-            <h2 className="font-display mt-3 text-5xl leading-[0.9] font-black uppercase sm:text-6xl">
+            <h2 className="font-display mt-2 text-3xl leading-tight font-black uppercase sm:text-5xl lg:text-6xl sm:leading-[0.9] text-foreground">
               A course for every age
             </h2>
+            <p className="mt-2 max-w-xl text-sm sm:text-base lg:text-lg text-muted-foreground">
+              Age-scaled circuits designed for safety, fun, and athletic confidence.
+            </p>
           </div>
 
-          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <label
-              htmlFor="age-finder"
-              className="flex items-baseline justify-between text-sm font-bold"
-            >
-              <span>Find your child’s category</span>
-              <span className="font-display text-3xl font-black text-primary">
-                {age}
-                {age === 16 ? '+' : ''} yrs
-              </span>
-            </label>
-            <input
-              id="age-finder"
-              type="range"
-              min={3}
-              max={16}
-              value={age}
-              onChange={(e) => setAge(Number(e.target.value))}
-              className="mt-3 w-full accent-[var(--primary)] cursor-pointer"
-            />
-            <p className="mt-2 text-sm text-muted-foreground">
-              Age on 28 Nov 2026 →{' '}
-              <span className="font-bold text-foreground">{match?.name}</span>
-            </p>
+          {/* Fully responsive age selector */}
+          <div className="w-full sm:w-auto grid grid-cols-4 gap-1 rounded-2xl border border-border/80 bg-card p-1 shadow-sm sm:flex sm:rounded-full sm:p-1.5">
+            {QUICK_AGES.map((q) => {
+              const isSelected = match?.id === q.categoryId
+              return (
+                <button
+                  key={q.label}
+                  type="button"
+                  onClick={() => setAge(q.age)}
+                  className={cn(
+                    'rounded-xl px-2 py-2 text-xs font-bold transition-all cursor-pointer text-center whitespace-nowrap sm:rounded-full sm:px-4 sm:text-sm',
+                    isSelected
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+                  )}
+                >
+                  {q.label}
+                </button>
+              )
+            })}
           </div>
         </div>
 
-        <div className="mt-12 grid gap-6 md:grid-cols-2 md:pb-10">
-          {CATEGORIES.map((c, i) => {
+        {/* 4 Clean, minimal cards responsive grid */}
+        <div className="mt-8 sm:mt-10 grid gap-4 sm:gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {CATEGORIES.map((c) => {
             const active = match?.id === c.id
             return (
               <article
                 key={c.id}
                 className={cn(
-                  'group relative overflow-hidden rounded-2xl border bg-card transition-all duration-300 motion-reduce:transition-none',
+                  'relative flex flex-col justify-between rounded-2xl border bg-card p-4 sm:p-6 transition-all duration-200',
                   active
-                    ? 'border-primary ring-2 ring-primary/20 shadow-xl shadow-primary/10'
-                    : 'border-border/80 hover:border-border hover:shadow-md',
-                  i % 2 === 1 && 'md:translate-y-8',
+                    ? 'border-primary ring-2 ring-primary/20 shadow-md bg-primary/[0.02]'
+                    : 'border-border/80 hover:border-border hover:shadow-sm',
                 )}
               >
-                <div className="relative h-52 overflow-hidden">
-                  <img
-                    src={cdnImage(c.image, 800)}
-                    alt={`${c.name} (${c.ages}) · Youth fitness racing category at FITKIDROX Chandigarh`}
-                    loading="lazy"
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 motion-reduce:transition-none"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-secondary/90 via-secondary/40 to-transparent" />
-                  <span className="font-display absolute bottom-3 left-4 text-6xl font-black text-secondary-foreground">
-                    {c.ages.replace(' years', '')}
-                    <span className="ml-1 text-xl">yrs</span>
-                  </span>
-                  {active && (
-                    <Badge className="absolute top-3 right-3 bg-primary text-primary-foreground font-bold shadow-sm">
-                      Your category
-                    </Badge>
-                  )}
-                </div>
-                <div className="p-6">
-                  <h3 className="font-display text-3xl font-black uppercase text-foreground">
+                <div>
+                  <div className="flex items-baseline justify-between">
+                    <span className="font-display text-3xl sm:text-5xl font-black text-foreground">
+                      {c.ages.replace(' years', '')}
+                      <span className="ml-1 text-xs sm:text-sm font-bold text-muted-foreground uppercase">
+                        yrs
+                      </span>
+                    </span>
+                    {active ? (
+                      <Badge className="bg-primary/10 text-primary border-primary/20 px-2.5 py-1 text-xs font-bold uppercase tracking-wider">
+                        Your child
+                      </Badge>
+                    ) : (
+                      <span className="text-xs font-bold text-muted-foreground">
+                        {c.stations.length} stations
+                      </span>
+                    )}
+                  </div>
+
+                  <h3 className="font-display mt-3 text-xl sm:text-2xl font-black uppercase text-foreground leading-snug">
                     {c.name}
                   </h3>
-                  <p className="mt-2 text-muted-foreground">{c.focus}</p>
-                  <ul className="mt-4 flex flex-wrap gap-2">
-                    {c.stations.map((s) => (
-                      <li
-                        key={s}
-                        className="rounded-full border border-border/60 bg-muted/70 px-3 py-1 text-xs font-semibold text-foreground/80"
-                      >
-                        {s}
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="mt-4 border-t border-border/70 pt-4 text-sm font-semibold text-foreground">
-                    {c.format}
+
+                  <p className="mt-2 text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                    {c.focus}
                   </p>
+
+                  <div className="mt-4 sm:mt-5 border-t border-border/60 pt-3 sm:pt-4">
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2.5 sm:mb-3">
+                      Stations
+                    </p>
+                    <ul className="space-y-1.5 sm:space-y-2 text-xs sm:text-sm font-semibold text-foreground">
+                      {c.stations.map((s) => (
+                        <li key={s} className="flex items-center gap-2">
+                          <span className="size-1.5 rounded-full bg-primary shrink-0" />
+                          <span className="truncate">{s}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="mt-5 sm:mt-6 border-t border-border/60 pt-3 sm:pt-4 space-y-2.5 sm:space-y-3">
+                  <p className="text-xs sm:text-sm font-semibold text-foreground/80 truncate">
+                    {c.format.split('·')[0].trim()}
+                  </p>
+                  <Button
+                    asChild
+                    size="default"
+                    variant={active ? 'default' : 'outline'}
+                    className={cn(
+                      'w-full h-10 text-sm font-bold',
+                      active
+                        ? 'shadow-xs shadow-primary/20'
+                        : 'bg-card hover:bg-primary hover:text-primary-foreground',
+                    )}
+                  >
+                    <Link to="/register">
+                      Register <ArrowRight className="size-4 ml-1" />
+                    </Link>
+                  </Button>
                 </div>
               </article>
             )
@@ -656,11 +693,6 @@ const MILESTONES = [
     status: 'Done',
   },
   {
-    label: 'Budget & safety plan',
-    detail: 'Station design, supervision ratios, first-aid and insurance',
-    status: 'In progress',
-  },
-  {
     label: 'School partners',
     detail: 'Recruiting partner schools across Chandigarh tricity',
     status: 'Open',
@@ -675,7 +707,11 @@ const MILESTONES = [
     detail: 'Online entry and payment now live',
     status: 'Open',
   },
-  { label: 'Race weekend', detail: EVENT.dateLabel, status: 'Upcoming' },
+  {
+    label: 'Race weekend',
+    detail: `${EVENT.dateLabel} · Two days of youth racing, relays and awards`,
+    status: 'Upcoming',
+  },
 ]
 
 function RoadToRaceDay() {
@@ -688,21 +724,23 @@ function RoadToRaceDay() {
         <h2 className="font-display mt-3 text-5xl leading-[0.9] font-black uppercase sm:text-6xl text-foreground">
           Where we are now
         </h2>
-        <ol className="mt-12 grid gap-4 md:grid-cols-3 lg:grid-cols-6">
+        <ol className="mt-12 grid gap-4 md:grid-cols-3 lg:grid-cols-5">
           {MILESTONES.map((m, i) => (
             <li
               key={m.label}
-              className="relative rounded-2xl border border-border/80 bg-card p-5 shadow-sm hover:border-primary/40 hover:shadow-md transition-all"
+              className="relative flex flex-col justify-between rounded-2xl border border-border/80 bg-card p-5 shadow-sm hover:border-primary/40 hover:shadow-md transition-all"
             >
-              <span className="font-display text-5xl font-black text-primary/25">
-                {String(i + 1).padStart(2, '0')}
-              </span>
-              <h3 className="mt-2 font-bold text-foreground">{m.label}</h3>
-              <p className="mt-1 text-sm text-muted-foreground">{m.detail}</p>
+              <div>
+                <span className="font-display text-5xl font-black text-primary/25">
+                  {String(i + 1).padStart(2, '0')}
+                </span>
+                <h3 className="mt-2 font-bold text-foreground">{m.label}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">{m.detail}</p>
+              </div>
               <Badge
                 variant="outline"
                 className={cn(
-                  'mt-4 font-semibold text-xs',
+                  'mt-4 w-fit font-semibold text-xs',
                   m.status === 'Done' &&
                     'border-emerald-700 bg-emerald-600 text-white',
                   m.status === 'In progress' &&
@@ -731,9 +769,25 @@ function Faq() {
     >
       <div className="mx-auto max-w-content px-4 sm:px-6">
         <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr]">
-          <h2 className="font-display text-5xl leading-[0.9] font-black uppercase sm:text-6xl">
-            Questions from parents
-          </h2>
+          <div>
+            <h2 className="font-display text-5xl leading-[0.9] font-black uppercase sm:text-6xl">
+              Questions from parents
+            </h2>
+            <p className="mt-4 text-base text-muted-foreground">
+              Have questions about race heats, equipment, or registration? Chat
+              directly with our event coordinators on WhatsApp.
+            </p>
+            <a
+              href={WHATSAPP_ENQUIRY_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Enquire on WhatsApp (+91 62693 38366)"
+              className="mt-6 inline-flex items-center gap-2.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-5 py-2.5 text-base font-bold text-foreground transition-all hover:bg-emerald-500/20 shadow-xs"
+            >
+              <WhatsAppIcon className="size-6 shrink-0" />
+              <span>Enquire on WhatsApp</span>
+            </a>
+          </div>
           <Accordion type="single" collapsible className="w-full">
             {FAQS.map((f) => (
               <AccordionItem key={f.q} value={f.q}>

@@ -12,6 +12,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 import { Logo } from './logo'
+import { WhatsAppIcon, WHATSAPP_ENQUIRY_URL } from './whatsapp-icon'
 
 const NAV = [
   { to: '/', hash: 'categories', label: 'Categories' },
@@ -65,9 +66,35 @@ export function SiteHeader() {
               {item.label}
             </Link>
           ))}
+
+          {/* WhatsApp icon to enquire */}
+          <a
+            href={WHATSAPP_ENQUIRY_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Enquire on WhatsApp (+91 62693 38366)"
+            title="Enquire on WhatsApp (+91 62693 38366)"
+            className="ml-2 inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-card px-3 py-1.5 text-sm font-bold text-foreground transition-all hover:border-emerald-500 hover:bg-emerald-500/10 shadow-xs hover:scale-105"
+          >
+            <WhatsAppIcon className="size-6 shrink-0" />
+            <span>Enquire</span>
+          </a>
         </nav>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Mobile WhatsApp direct button */}
+          <a
+            href={WHATSAPP_ENQUIRY_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Enquire on WhatsApp (+91 62693 38366)"
+            title="Enquire on WhatsApp"
+            className="flex md:hidden items-center gap-1.5 rounded-full border border-emerald-500/30 bg-card px-2.5 py-1.5 text-xs font-bold text-foreground transition-all hover:bg-emerald-500/10 active:scale-95 shadow-xs"
+          >
+            <WhatsAppIcon className="size-4 shrink-0" />
+            <span className="text-[11px]">Enquire</span>
+          </a>
+
           <Button asChild className="hidden font-bold sm:inline-flex">
             <Link to="/register">Register your child</Link>
           </Button>
@@ -109,10 +136,22 @@ export function SiteHeader() {
                     {item.label}
                   </Link>
                 ))}
+
+                <a
+                  href={WHATSAPP_ENQUIRY_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setOpen(false)}
+                  className="mt-4 flex items-center justify-center gap-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 py-3 text-base font-bold text-foreground transition-all hover:bg-emerald-500/20"
+                >
+                  <WhatsAppIcon className="size-6 shrink-0" />
+                  <span>Enquire on WhatsApp</span>
+                </a>
+
                 <Button
                   asChild
                   size="lg"
-                  className="mt-6 font-bold shadow-md shadow-primary/20"
+                  className="mt-4 font-bold shadow-md shadow-primary/20"
                 >
                   <Link to="/register" onClick={() => setOpen(false)}>
                     Register your child
