@@ -72,8 +72,8 @@ export function SiteHeader() {
             href={WHATSAPP_ENQUIRY_URL}
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="Enquire on WhatsApp (+91 62693 38366)"
-            title="Enquire on WhatsApp (+91 62693 38366)"
+            aria-label="Enquire on WhatsApp (+91 73895 05338)"
+            title="Enquire on WhatsApp (+91 73895 05338)"
             className="ml-2 inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-card px-3 py-1.5 text-sm font-bold text-foreground transition-all hover:border-emerald-500 hover:bg-emerald-500/10 shadow-xs hover:scale-105"
           >
             <WhatsAppIcon className="size-6 shrink-0" />
@@ -87,7 +87,7 @@ export function SiteHeader() {
             href={WHATSAPP_ENQUIRY_URL}
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="Enquire on WhatsApp (+91 62693 38366)"
+            aria-label="Enquire on WhatsApp (+91 73895 05338)"
             title="Enquire on WhatsApp"
             className="flex md:hidden items-center gap-1.5 rounded-full border border-emerald-500/30 bg-card px-2.5 py-1.5 text-xs font-bold text-foreground transition-all hover:bg-emerald-500/10 active:scale-95 shadow-xs"
           >
