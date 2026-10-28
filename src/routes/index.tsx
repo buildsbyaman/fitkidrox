@@ -781,7 +781,7 @@ function Faq() {
               href={WHATSAPP_ENQUIRY_URL}
               target="_blank"
               rel="noopener noreferrer"
-              aria-label="Enquire on WhatsApp (+91 62693 38366)"
+              aria-label="Enquire on WhatsApp (+91 73895 05338)"
               className="mt-6 inline-flex items-center gap-2.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-5 py-2.5 text-base font-bold text-foreground transition-all hover:bg-emerald-500/20 shadow-xs"
             >
               <WhatsAppIcon className="size-6 shrink-0" />

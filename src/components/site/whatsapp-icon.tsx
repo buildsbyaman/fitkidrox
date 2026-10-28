@@ -1,7 +1,7 @@
 export const WHATSAPP_NUMBER = '+91 62693 38366'
 export const WHATSAPP_DEFAULT_MESSAGE =
   'Hello! I would like more information about FITKIDROX Chandigarh 2026.'
-export const WHATSAPP_ENQUIRY_URL = `https://wa.me/916269338366?text=${encodeURIComponent(WHATSAPP_DEFAULT_MESSAGE)}`
+export const WHATSAPP_ENQUIRY_URL = `https://wa.me/917389505338?text=${encodeURIComponent(WHATSAPP_DEFAULT_MESSAGE)}`
 
 /**
  * Official authentic WhatsApp icon in signature green (#25D366) and white.
