@@ -79,6 +79,12 @@ export function getCurrentUser(): Promise<AuthUser | null> {
     .catch(() => null)
 }
 
+export function getAuthConfig(): Promise<{ googleClientId: string }> {
+  return get<{ googleClientId: string }>('/api/auth/config').catch(() => ({
+    googleClientId: '',
+  }))
+}
+
 export function loginWithGoogleCredential(
   credential: string,
 ): Promise<AuthUser> {

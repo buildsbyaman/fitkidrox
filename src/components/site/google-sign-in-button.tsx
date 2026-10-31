@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
+import { getAuthConfig } from '@/data/api'
 import { useAuth } from '@/lib/auth-context'
 import { GoogleIcon } from './google-icon'
 
@@ -50,11 +51,33 @@ export function GoogleSignInButton({
   const { loginWithCredential } = useAuth()
   const buttonRef = useRef<HTMLDivElement>(null)
   const [loading, setLoading] = useState(false)
+  const [dynamicClientId, setDynamicClientId] = useState<string>('')
+  const [isFetchingConfig, setIsFetchingConfig] = useState(
+    () => !import.meta.env.VITE_GOOGLE_CLIENT_ID,
+  )
   const [scriptLoaded, setScriptLoaded] = useState(
     () => typeof window !== 'undefined' && Boolean(window.google?.accounts?.id),
   )
 
-  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
+  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || dynamicClientId
+
+  // Fallback: Fetch client ID from server config if omitted at build time
+  useEffect(() => {
+    if (clientId) return
+    let active = true
+    getAuthConfig()
+      .then((cfg) => {
+        if (active && cfg.googleClientId) {
+          setDynamicClientId(cfg.googleClientId)
+        }
+      })
+      .finally(() => {
+        if (active) setIsFetchingConfig(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [clientId])
 
   // Wait for Google Identity Services script if not yet ready
   useEffect(() => {
@@ -109,6 +132,15 @@ export function GoogleSignInButton({
   }, [scriptLoaded, clientId, theme, text, loginWithCredential, onSuccess])
 
   if (!clientId) {
+    if (isFetchingConfig) {
+      return (
+        <div className="flex h-11 w-[280px] items-center justify-center gap-2 rounded-md border border-border bg-card text-xs text-muted-foreground">
+          <Loader2 className="size-4 animate-spin text-primary" />
+          <span>Loading Google Sign-In...</span>
+        </div>
+      )
+    }
+
     return (
       <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-amber-500/50 bg-amber-500/10 p-4 text-center text-xs text-amber-800 dark:text-amber-200">
         <div className="flex items-center gap-2 font-semibold">
@@ -116,8 +148,8 @@ export function GoogleSignInButton({
           <span>Google Sign-In Configuration Required</span>
         </div>
         <p className="max-w-xs text-muted-foreground">
-          Please add <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px] text-foreground">VITE_GOOGLE_CLIENT_ID</code> to your{' '}
-          <code className="font-mono text-[11px]">.env</code> file.
+          Please add <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px] text-foreground">VITE_GOOGLE_CLIENT_ID</code> or{' '}
+          <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px] text-foreground">GOOGLE_CLIENT_ID</code> to your environment.
         </p>
       </div>
     )

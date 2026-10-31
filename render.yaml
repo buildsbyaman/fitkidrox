@@ -15,3 +15,29 @@ services:
         sync: false
       - key: ADMIN_PASSWORD
         sync: false
+      - key: VITE_GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: VITE_RAZORPAY_KEY_ID
+        sync: false
+      - key: ENTRY_FEE_PAISE
+        value: "125000"
+      - key: EMAIL_DISPATCH_ENABLED
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        value: "\"FITKIDROX Chandigarh\" <hello@fitkidrox.in>"
+      - key: SMTP_HOST
+        value: "smtp.gmail.com"
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_SECURE
+        value: "false"

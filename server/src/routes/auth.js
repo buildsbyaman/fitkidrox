@@ -14,6 +14,17 @@ import {
 
 export const authRouter = Router()
 
+/**
+ * GET /api/auth/config
+ * Provides public client ID so the frontend can initialize GIS even if
+ * VITE_GOOGLE_CLIENT_ID was not passed into Vite's build environment.
+ */
+authRouter.get('/config', (req, res) => {
+  res.json({
+    googleClientId: process.env.GOOGLE_CLIENT_ID || '',
+  })
+})
+
 const loginLimiter = createRateLimiter({
   windowMs: 15 * 60 * 1000,
   maxRequests: 50,
