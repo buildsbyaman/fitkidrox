@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as SchoolsRouteImport } from './routes/schools'
 import { Route as SponsorsRouteImport } from './routes/sponsors'
@@ -23,6 +24,11 @@ const IndexRoute = IndexRouteImport.update({
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RegisterRoute = RegisterRouteImport.update({
@@ -44,6 +50,7 @@ const SponsorsRoute = SponsorsRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/dashboard': typeof DashboardRoute
   '/register': typeof RegisterRoute
   '/schools': typeof SchoolsRoute
   '/sponsors': typeof SponsorsRoute
@@ -51,6 +58,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/dashboard': typeof DashboardRoute
   '/register': typeof RegisterRoute
   '/schools': typeof SchoolsRoute
   '/sponsors': typeof SponsorsRoute
@@ -59,21 +67,31 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/dashboard': typeof DashboardRoute
   '/register': typeof RegisterRoute
   '/schools': typeof SchoolsRoute
   '/sponsors': typeof SponsorsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin' | '/register' | '/schools' | '/sponsors'
+  fullPaths:
+    '/' | '/admin' | '/dashboard' | '/register' | '/schools' | '/sponsors'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/register' | '/schools' | '/sponsors'
-  id: '__root__' | '/' | '/admin' | '/register' | '/schools' | '/sponsors'
+  to: '/' | '/admin' | '/dashboard' | '/register' | '/schools' | '/sponsors'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/dashboard'
+    | '/register'
+    | '/schools'
+    | '/sponsors'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  DashboardRoute: typeof DashboardRoute
   RegisterRoute: typeof RegisterRoute
   SchoolsRoute: typeof SchoolsRoute
   SponsorsRoute: typeof SponsorsRoute
@@ -93,6 +111,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/register': {
@@ -122,6 +147,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  DashboardRoute: DashboardRoute,
   RegisterRoute: RegisterRoute,
   SchoolsRoute: SchoolsRoute,
   SponsorsRoute: SponsorsRoute,

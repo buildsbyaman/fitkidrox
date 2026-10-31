@@ -74,6 +74,11 @@ const ParticipantSchema = new Schema(
         message: 'guardianEmail must be a valid email.',
       },
     },
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      index: true,
+    },
     relation: { type: String, trim: true, default: 'Parent' },
     medicalNotes: { type: String, trim: true, maxlength: 2000, default: '' },
 

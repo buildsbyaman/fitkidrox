@@ -1,8 +1,16 @@
 import { Link } from '@tanstack/react-router'
-import { Menu } from 'lucide-react'
+import { ChevronDown, LogOut, Menu } from 'lucide-react'
 import { useState } from 'react'
 
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   Sheet,
   SheetContent,
@@ -11,6 +19,8 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet'
+import { useAuth } from '@/lib/auth-context'
+import { GoogleIcon } from './google-icon'
 import { Logo } from './logo'
 import { WhatsAppIcon, WHATSAPP_ENQUIRY_URL } from './whatsapp-icon'
 
@@ -24,6 +34,7 @@ const NAV = [
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false)
+  const { user, logout } = useAuth()
 
   const handleNavClick = (
     e: React.MouseEvent<HTMLAnchorElement>,
@@ -95,6 +106,71 @@ export function SiteHeader() {
             <span className="text-[11px]">Enquire</span>
           </a>
 
+          {user ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex items-center gap-2 rounded-full border border-border bg-card p-1 pr-2.5 transition hover:border-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label="User account menu"
+                >
+                  {user.picture ? (
+                    <img
+                      src={user.picture}
+                      alt={user.name}
+                      className="size-7 rounded-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="flex size-7 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary">
+                      {user.name.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <span className="hidden max-w-[100px] truncate text-xs font-semibold text-foreground sm:inline-block">
+                    {user.name.split(' ')[0]}
+                  </span>
+                  <ChevronDown className="size-3 text-muted-foreground" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 p-2">
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-semibold leading-none">{user.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link to="/dashboard" className="cursor-pointer font-medium">
+                    My Registrations
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/register" className="cursor-pointer">
+                    Register child
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={logout}
+                  className="cursor-pointer text-destructive focus:text-destructive"
+                >
+                  <LogOut className="mr-2 size-4" />
+                  <span>Sign out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className="hidden text-xs font-bold text-foreground/80 hover:text-foreground sm:inline-flex"
+            >
+              <Link to="/register">Sign in</Link>
+            </Button>
+          )}
+
           <Button asChild className="hidden font-bold sm:inline-flex">
             <Link to="/register">Register your child</Link>
           </Button>
@@ -147,6 +223,68 @@ export function SiteHeader() {
                   <WhatsAppIcon className="size-6 shrink-0" />
                   <span>Enquire on WhatsApp</span>
                 </a>
+
+                {user ? (
+                  <div className="mt-4 rounded-xl border border-border bg-muted/40 p-3.5">
+                    <div className="flex items-center gap-3">
+                      {user.picture ? (
+                        <img
+                          src={user.picture}
+                          alt=""
+                          className="size-10 rounded-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <div className="flex size-10 items-center justify-center rounded-full bg-primary/20 text-sm font-bold text-primary">
+                          {user.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="flex flex-col min-w-0">
+                        <span className="truncate text-sm font-bold text-foreground">
+                          {user.name}
+                        </span>
+                        <span className="truncate text-xs text-muted-foreground">
+                          {user.email}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <Button
+                        asChild
+                        variant="secondary"
+                        size="sm"
+                        className="w-full text-xs font-bold"
+                      >
+                        <Link to="/dashboard" onClick={() => setOpen(false)}>
+                          My Registrations
+                        </Link>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          logout()
+                          setOpen(false)
+                        }}
+                        className="w-full justify-center gap-1.5 border-border text-xs font-semibold text-destructive hover:bg-destructive/10"
+                      >
+                        <LogOut className="size-3.5" />
+                        <span>Sign out</span>
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    asChild
+                    variant="outline"
+                    className="mt-4 gap-2 font-bold"
+                  >
+                    <Link to="/register" onClick={() => setOpen(false)}>
+                      <GoogleIcon className="size-4" />
+                      <span>Sign in with Google</span>
+                    </Link>
+                  </Button>
+                )}
 
                 <Button
                   asChild

@@ -23,6 +23,7 @@ import { createWithUniqueReference } from './lib/reference.js'
 import { Participant } from './models/Participant.js'
 import { School } from './models/School.js'
 import { Sponsor } from './models/Sponsor.js'
+import { authRouter } from './routes/auth.js'
 import { participantsRouter } from './routes/participants.js'
 import { paymentsRouter } from './routes/payments.js'
 import { schoolsRouter } from './routes/schools.js'
@@ -141,6 +142,7 @@ export function createApp({
     message: 'Too many verification attempts from this IP. Please try again later.',
   })
 
+  app.use('/api/auth', authRouter)
   app.use('/api/participants', publicSubmissionLimiter, participantsRouter)
   app.use('/api/schools', publicSubmissionLimiter, schoolsRouter)
   app.use('/api/sponsors', publicSubmissionLimiter, sponsorsRouter)
@@ -363,6 +365,11 @@ export function createApp({
           }
         }
 
+        let existing = null
+        if (req.params.collection === 'participants') {
+          existing = await Model.findOne(filter).lean()
+        }
+
         const updates = { ...(req.body ?? {}) }
         delete updates._id
         delete updates.createdAt
@@ -373,11 +380,14 @@ export function createApp({
           updates['payment.status'] = updates.paymentStatus
           delete updates.paymentStatus
         }
+
+        const newPaymentStatus = updates['payment.status']
+        const wasPaid = existing?.payment?.status === 'paid'
+        const isBecomingPaid = newPaymentStatus === 'paid' && !wasPaid
+        const isSettingPaid = newPaymentStatus === 'paid'
+
         if (updates.paymentAmount !== undefined) {
           if (req.params.collection === 'participants') {
-            const existing = await Model.findOne(filter)
-              .select('isManual payment')
-              .lean()
             if (existing && !existing.isManual) {
               delete updates.paymentAmount
               delete updates['payment.amount']
@@ -395,7 +405,7 @@ export function createApp({
           }
         }
         if (updates['payment.status'] === 'paid' && !updates['payment.paidAt']) {
-          updates['payment.paidAt'] = new Date()
+          updates['payment.paidAt'] = existing?.payment?.paidAt || new Date()
         }
 
         let doc = await Model.findOneAndUpdate(
@@ -406,25 +416,34 @@ export function createApp({
 
         if (!doc) return res.status(404).json({ error: 'Record not found.' })
 
-        // If participant was marked paid and doesn't have a bib yet, assign one
+        // If participant was marked paid, ensure bib is allocated and trigger allotment mail
         if (
           req.params.collection === 'participants' &&
-          doc.payment?.status === 'paid' &&
-          !doc.bibNumber
+          doc.payment?.status === 'paid'
         ) {
-          const bibResult = await assignBibToParticipant(doc._id, {
-            ParticipantModel: Participant,
-            allowReserved: true,
-          })
-          doc = bibResult.participant
-          sendParticipantConfirmationEmail({
-            participant: doc,
-            bibNumber: bibResult.bibNumber,
-            heat: bibResult.heat,
-            course: bibResult.course,
-          }).catch((err) =>
-            console.error('[mailer] Failed to send participant confirmation email:', err),
-          )
+          if (!doc.bibNumber) {
+            const bibResult = await assignBibToParticipant(doc._id, {
+              ParticipantModel: Participant,
+              allowReserved: true,
+            })
+            doc =
+              (await Participant.findById(doc._id).lean()) ||
+              bibResult.participant
+          }
+
+          if (isBecomingPaid || isSettingPaid) {
+            sendParticipantConfirmationEmail({
+              participant: doc,
+              bibNumber: doc.bibNumber,
+              heat: doc.heat,
+              course: doc.course,
+            }).catch((err) =>
+              console.error(
+                '[mailer] Failed to send participant confirmation email:',
+                err,
+              ),
+            )
+          }
         }
 
         res.json({ ok: true, doc })

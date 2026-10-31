@@ -23,6 +23,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     res = await fetch(`${API_BASE}${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify(body),
     })
   } catch {
@@ -40,6 +41,93 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   }
 
   return data as T
+}
+
+async function get<T>(path: string): Promise<T> {
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method: 'GET',
+      credentials: 'include',
+    })
+  } catch {
+    throw new ApiError('Could not reach the server.', 0)
+  }
+
+  const data = (await res.json().catch(() => null)) as { error?: string } | null
+
+  if (!res.ok) {
+    throw new ApiError(
+      data?.error ?? 'The server rejected this request.',
+      res.status,
+    )
+  }
+
+  return data as T
+}
+
+export interface AuthUser {
+  id: string
+  email: string
+  name: string
+  picture?: string
+}
+
+export function getCurrentUser(): Promise<AuthUser | null> {
+  return get<{ ok: boolean; user: AuthUser | null }>('/api/auth/me')
+    .then((res) => res.user)
+    .catch(() => null)
+}
+
+export function loginWithGoogleCredential(
+  credential: string,
+): Promise<AuthUser> {
+  return post<{ ok: boolean; user: AuthUser }>('/api/auth/google', {
+    credential,
+  }).then((res) => res.user)
+}
+
+export function logoutUser(): Promise<void> {
+  return post<{ ok: boolean }>('/api/auth/logout', {}).then(() => undefined)
+}
+
+export interface ParticipantRecord {
+  _id: string
+  reference: string
+  childName: string
+  dob: string
+  gender: string
+  category: string
+  tshirt: string
+  school: string
+  guardianName: string
+  guardianPhone: string
+  guardianEmail: string
+  relation: string
+  medicalNotes?: string
+  consentParticipation: boolean
+  consentMedical: boolean
+  consentPhotos: boolean
+  payment?: {
+    status?: 'unpaid' | 'paid' | 'failed'
+    amount?: number
+    orderId?: string
+    paymentId?: string
+    paidAt?: string
+  }
+  bibNumber?: number | null
+  heat?: number | null
+  course?: 'Course A' | 'Course B' | null
+  checkedIn?: boolean
+  checkedInAt?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export function getMyRegistrations(): Promise<ParticipantRecord[]> {
+  return get<{ ok: boolean; registrations: ParticipantRecord[] }>(
+    '/api/participants/my',
+  ).then((res) => res.registrations)
 }
 
 export interface ParticipantSubmission {

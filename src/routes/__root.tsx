@@ -9,6 +9,7 @@ import {
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { NotFoundPage } from '@/components/error-pages'
+import { AuthProvider } from '@/lib/auth-context'
 
 import '../styles.css'
 
@@ -172,6 +173,13 @@ export const Route = createRootRoute({
       // supply-chain dependency, and one less GDPR/privacy loose end.
       { rel: 'stylesheet', href: '/fonts/fonts.css' },
     ],
+    scripts: [
+      {
+        src: 'https://accounts.google.com/gsi/client',
+        async: true,
+        defer: true,
+      },
+    ],
   }),
   shellComponent: RootDocument,
   notFoundComponent: NotFoundPage,
@@ -197,9 +205,11 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        <ScrollToTop />
-        <TooltipProvider>{children}</TooltipProvider>
-        <Toaster />
+        <AuthProvider>
+          <ScrollToTop />
+          <TooltipProvider>{children}</TooltipProvider>
+          <Toaster />
+        </AuthProvider>
         <Scripts />
       </body>
     </html>

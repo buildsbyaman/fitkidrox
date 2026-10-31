@@ -33,14 +33,27 @@ export function getMailTransporter() {
   const user = process.env.SMTP_USER || ''
   const pass = process.env.SMTP_PASS || ''
 
-  if (!user || !pass) {
+  const isDispatchEnabled = process.env.EMAIL_DISPATCH_ENABLED === 'true'
+
+  if (!isDispatchEnabled || !user || !pass) {
+    const reason = !isDispatchEnabled
+      ? 'Safe Mode (EMAIL_DISPATCH_ENABLED=false: no real network email sent)'
+      : 'SMTP credentials missing'
     return {
-      configured: false,
+      configured: Boolean(user && pass),
+      dispatchEnabled: isDispatchEnabled,
       sendMail: async (options) => {
         console.warn(
-          `[mailer] SMTP_USER or SMTP_PASS not set in server/.env. Simulating email dispatch to: ${options.to} | Subject: "${options.subject}"`,
+          `[mailer] [${reason}] Allotment email prepared for: ${options.to} | Subject: "${options.subject}"`,
         )
-        return { messageId: `mock-${Date.now()}`, simulated: true }
+        return {
+          messageId: `simulated-${Date.now()}`,
+          simulated: true,
+          to: options.to,
+          subject: options.subject,
+          html: options.html,
+          text: options.text,
+        }
       },
     }
   }
@@ -60,6 +73,7 @@ export function getMailTransporter() {
 
   return {
     configured: true,
+    dispatchEnabled: true,
     transporter,
     sendMail: transporter.sendMail.bind(transporter),
   }
@@ -195,21 +209,16 @@ function renderMinimalTemplate({
 }
 
 /**
- * 1. Participant Confirmation Email
- * Bib number presented in simple highlighted text, not overly bold, with 6px border-radius everywhere.
+ * Builds the complete Allotment Confirmation Email content (HTML and plain text).
+ * Reusable for actual dispatch as well as on-demand previewing in the admin panel.
  */
-export async function sendParticipantConfirmationEmail({
+export function buildParticipantAllotmentEmail({
   participant,
   bibNumber,
   heat,
   course,
 }) {
-  const recipient = participant.guardianEmail
-  if (!recipient) {
-    console.warn('[mailer] Cannot send participant email: guardianEmail is missing.')
-    return { skipped: true, reason: 'missing_email' }
-  }
-
+  const recipient = participant.guardianEmail || ''
   const assignedBib = bibNumber || participant.bibNumber || 'Pending'
   const assignedHeat = heat || participant.heat || 1
   const assignedCourse =
@@ -221,23 +230,29 @@ export async function sendParticipantConfirmationEmail({
 
   const amountPaid = Number(participant.payment?.amount ?? 1250).toLocaleString('en-IN')
 
-  const title = `Registration confirmed, ${childFirst}`
-  const preheader = `${childFirst} is registered for FITKIDROX 2026. Bib #${assignedBib}, Heat ${assignedHeat}, ${assignedCourse}.`
+  const title = `Allotment Confirmed, ${childFirst}`
+  const preheader = `Your payment was successfully confirmed! Official Slot & Bib Allotment Confirmed for ${participant.childName || 'Athlete'}. Bib #${assignedBib}, Heat ${assignedHeat}, ${assignedCourse}.`
+  const subject = `Successful Allotment Confirmed: ${participant.childName || 'Athlete'} (Bib #${assignedBib})`
 
-  const descriptionText = `${childFirst}’s spot in <strong>${participant.category || 'FITKIDROX'}</strong> is confirmed. Please present your Bib Number at the athlete check-in desk on race day.`
+  const descriptionText = `Your payment of <strong>₹${amountPaid}</strong> was successfully confirmed, and ${childFirst}’s spot in <strong>${participant.category || 'FITKIDROX'}</strong> has been officially allotted. Please find your assigned Bib Number, Heat, and Course details below. Present your Bib Number at the athlete check-in desk on race day.`
 
-  // Bib number is presented as simple highlighted text without a big surrounding div
+  // Bib number presented as simple highlighted text
   const bibHighlightedText = `<span style="display: inline-block; font-size: 15px; font-weight: 700; color: #111827; background-color: #F1F5F9; border: 1px solid #E2E8F0; padding: 2px 8px; border-radius: 4px; letter-spacing: 0.5px;">#${assignedBib}</span>`
+
+  const heatCourseHighlightedText = `<span style="display: inline-block; font-size: 13px; font-weight: 600; color: #0369A1; background-color: #E0F2FE; border: 1px solid #BAE6FD; padding: 1px 7px; border-radius: 4px;">Heat ${assignedHeat}</span> &nbsp;&middot;&nbsp; <span style="display: inline-block; font-size: 13px; font-weight: 600; color: #047857; background-color: #D1FAE5; border: 1px solid #A7F3D0; padding: 1px 7px; border-radius: 4px;">${assignedCourse}</span>`
+
+  const paymentConfirmedPill = `<span style="display: inline-block; font-size: 13px; font-weight: 600; color: #047857; background-color: #D1FAE5; border: 1px solid #A7F3D0; padding: 1px 7px; border-radius: 4px;">✓ Payment Confirmed</span>`
 
   const detailsRows = [
     { label: 'Bib Number (ID)', value: bibHighlightedText },
-    { label: 'Assigned Heat & Course', value: `Heat ${assignedHeat} &middot; ${assignedCourse}` },
+    { label: 'Assigned Heat & Course', value: heatCourseHighlightedText },
     { label: 'Athlete Name', value: participant.childName },
     { label: 'Category', value: participant.category },
-    { label: 'Date of Birth', value: `${participant.dob} (${participant.gender})` },
-    { label: 'T-Shirt Size', value: participant.tshirt },
+    { label: 'Date of Birth', value: `${participant.dob || '—'} (${participant.gender || '—'})` },
+    { label: 'T-Shirt Size', value: participant.tshirt || '—' },
     { label: 'School / Team', value: participant.school || 'Individual Entry' },
-    { label: 'Parent / Guardian', value: `${participant.guardianName} (+91 ${participant.guardianPhone})` },
+    { label: 'Parent / Guardian', value: `${participant.guardianName || '—'} (+91 ${participant.guardianPhone || '—'})` },
+    { label: 'Payment Status', value: paymentConfirmedPill },
     { label: 'Amount Paid', value: `₹${amountPaid} (Paid)` },
     { label: 'Event Dates', value: DEFAULT_EVENT.dateLabel },
     { label: 'Venue', value: DEFAULT_EVENT.venue },
@@ -248,13 +263,15 @@ export async function sendParticipantConfirmationEmail({
   `
 
   const text = `
-Registration confirmed, ${childFirst}!
+Allotment Confirmed, ${childFirst}!
 
-${childFirst}’s spot in ${participant.category || 'FITKIDROX'} is officially confirmed.
+Your payment of ₹${amountPaid} was successfully confirmed.
+${childFirst}’s spot in ${participant.category || 'FITKIDROX'} is officially confirmed and allotted.
 
 Bib Number: #${assignedBib}
-Assigned Heat: Heat ${assignedHeat} (${assignedCourse})
+Assigned Heat & Course: Heat ${assignedHeat} (${assignedCourse})
 Category: ${participant.category}
+Payment Status: Successfully Confirmed (₹${amountPaid} Paid)
 Amount Paid: ₹${amountPaid} (Paid)
 
 Dates: ${DEFAULT_EVENT.dateLabel}
@@ -272,17 +289,69 @@ Visit: ${DEFAULT_EVENT.website}
     instructionsText,
   })
 
+  return {
+    recipient,
+    subject,
+    title,
+    preheader,
+    descriptionText,
+    detailsRows,
+    instructionsText,
+    text,
+    html,
+    bibNumber: assignedBib,
+    heat: assignedHeat,
+    course: assignedCourse,
+  }
+}
+
+/**
+ * 1. Participant Confirmation & Allotment Email
+ * Bib number presented in simple highlighted text, not overly bold, with 6px border-radius everywhere.
+ */
+export async function sendParticipantConfirmationEmail({
+  participant,
+  bibNumber,
+  heat,
+  course,
+}) {
+  const mailData = buildParticipantAllotmentEmail({
+    participant,
+    bibNumber,
+    heat,
+    course,
+  })
+
+  const recipient = mailData.recipient
+  if (!recipient) {
+    console.warn('[mailer] Cannot send participant email: guardianEmail is missing.')
+    return {
+      skipped: true,
+      reason: 'missing_email',
+      ...mailData,
+    }
+  }
+
   const mailer = getMailTransporter()
   const info = await mailer.sendMail({
     from: getSender(),
     to: recipient,
-    subject: `Registration confirmed: ${participant.childName} (Bib #${assignedBib})`,
-    text,
-    html,
+    subject: mailData.subject,
+    text: mailData.text,
+    html: mailData.html,
   })
 
-  console.log(`[mailer] Participant email dispatched to ${recipient} (messageId: ${info.messageId})`)
-  return info
+  console.log(`[mailer] Participant allotment email processed for ${recipient} (messageId: ${info.messageId})`)
+  return {
+    ...info,
+    to: recipient,
+    subject: mailData.subject,
+    text: mailData.text,
+    html: mailData.html,
+    bibNumber: mailData.bibNumber,
+    heat: mailData.heat,
+    course: mailData.course,
+  }
 }
 
 /**
