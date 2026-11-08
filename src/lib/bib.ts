@@ -13,8 +13,8 @@ export interface CategoryBibConfig {
 }
 
 export const DEFAULT_BIB_CONFIG: Record<string, CategoryBibConfig> = {
-  'Mini FITKIDROX': {
-    name: 'Mini FITKIDROX',
+  'Mini Rox': {
+    name: 'Mini Rox',
     ages: '3–5 years',
     prefix: 1,
     minBib: 1001,
@@ -22,8 +22,8 @@ export const DEFAULT_BIB_CONFIG: Record<string, CategoryBibConfig> = {
     reservedCount: 50,
     heatSize: 8,
   },
-  'Kids Fitness Challenge': {
-    name: 'Kids Fitness Challenge',
+  'Junior Rox': {
+    name: 'Junior Rox',
     ages: '6–8 years',
     prefix: 2,
     minBib: 2001,
@@ -31,8 +31,8 @@ export const DEFAULT_BIB_CONFIG: Record<string, CategoryBibConfig> = {
     reservedCount: 50,
     heatSize: 10,
   },
-  'Athletic Challenge': {
-    name: 'Athletic Challenge',
+  'Rising Rox': {
+    name: 'Rising Rox',
     ages: '9–12 years',
     prefix: 3,
     minBib: 3001,
@@ -40,8 +40,8 @@ export const DEFAULT_BIB_CONFIG: Record<string, CategoryBibConfig> = {
     reservedCount: 50,
     heatSize: 10,
   },
-  'Performance FITKIDROX': {
-    name: 'Performance FITKIDROX',
+  'Senior Rox': {
+    name: 'Senior Rox',
     ages: '13+ years',
     prefix: 4,
     minBib: 4001,
@@ -50,6 +50,12 @@ export const DEFAULT_BIB_CONFIG: Record<string, CategoryBibConfig> = {
     heatSize: 8,
   },
 }
+
+// Backward compatibility aliases for existing data and tests
+DEFAULT_BIB_CONFIG['Mini FITKIDROX'] = DEFAULT_BIB_CONFIG['Mini Rox']
+DEFAULT_BIB_CONFIG['Kids Fitness Challenge'] = DEFAULT_BIB_CONFIG['Junior Rox']
+DEFAULT_BIB_CONFIG['Athletic Challenge'] = DEFAULT_BIB_CONFIG['Rising Rox']
+DEFAULT_BIB_CONFIG['Performance FITKIDROX'] = DEFAULT_BIB_CONFIG['Senior Rox']
 
 export interface HeatAndCourseResult {
   bibNumber: number
@@ -82,16 +88,31 @@ export function resolveCategoryConfig(
       }
     }
     if (s.includes('mini') || s.includes('3–5') || s.includes('3-5')) {
-      return DEFAULT_BIB_CONFIG['Mini FITKIDROX']
+      return DEFAULT_BIB_CONFIG['Mini Rox']
     }
-    if (s.includes('kids') || s.includes('6–8') || s.includes('6-8')) {
-      return DEFAULT_BIB_CONFIG['Kids Fitness Challenge']
+    if (
+      s.includes('junior') ||
+      s.includes('kids') ||
+      s.includes('6–8') ||
+      s.includes('6-8')
+    ) {
+      return DEFAULT_BIB_CONFIG['Junior Rox']
     }
-    if (s.includes('athletic') || s.includes('9–12') || s.includes('9-12')) {
-      return DEFAULT_BIB_CONFIG['Athletic Challenge']
+    if (
+      s.includes('rising') ||
+      s.includes('athletic') ||
+      s.includes('9–12') ||
+      s.includes('9-12')
+    ) {
+      return DEFAULT_BIB_CONFIG['Rising Rox']
     }
-    if (s.includes('performance') || s.includes('13+') || s.includes('13')) {
-      return DEFAULT_BIB_CONFIG['Performance FITKIDROX']
+    if (
+      s.includes('senior') ||
+      s.includes('performance') ||
+      s.includes('13+') ||
+      s.includes('13')
+    ) {
+      return DEFAULT_BIB_CONFIG['Senior Rox']
     }
   }
 
@@ -103,10 +124,10 @@ export function resolveCategoryConfig(
       const m = eventDate.getMonth() - birth.getMonth()
       if (m < 0 || (m === 0 && eventDate.getDate() < birth.getDate())) age--
 
-      if (age >= 3 && age <= 5) return DEFAULT_BIB_CONFIG['Mini FITKIDROX']
-      if (age >= 6 && age <= 8) return DEFAULT_BIB_CONFIG['Kids Fitness Challenge']
-      if (age >= 9 && age <= 12) return DEFAULT_BIB_CONFIG['Athletic Challenge']
-      if (age >= 13) return DEFAULT_BIB_CONFIG['Performance FITKIDROX']
+      if (age >= 3 && age <= 5) return DEFAULT_BIB_CONFIG['Mini Rox']
+      if (age >= 6 && age <= 8) return DEFAULT_BIB_CONFIG['Junior Rox']
+      if (age >= 9 && age <= 12) return DEFAULT_BIB_CONFIG['Rising Rox']
+      if (age >= 13) return DEFAULT_BIB_CONFIG['Senior Rox']
     }
   }
 

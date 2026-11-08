@@ -23,6 +23,7 @@ import { createWithUniqueReference } from './lib/reference.js'
 import { Participant } from './models/Participant.js'
 import { School } from './models/School.js'
 import { Sponsor } from './models/Sponsor.js'
+import { Coupon } from './models/Coupon.js'
 import { authRouter } from './routes/auth.js'
 import { participantsRouter } from './routes/participants.js'
 import { paymentsRouter } from './routes/payments.js'
@@ -33,6 +34,7 @@ const ADMIN_COLLECTIONS = {
   participants: Participant,
   schools: School,
   sponsors: Sponsor,
+  coupons: Coupon,
 }
 
 /**
@@ -345,6 +347,70 @@ export function createApp({
     }
   })
 
+  /** POST /api/admin/coupons — create a new coupon code */
+  app.post('/api/admin/coupons', requireAuth, async (req, res, next) => {
+    try {
+      const {
+        code,
+        description,
+        discountType,
+        discountValue,
+        minStudents,
+        maxDiscount,
+        isActive,
+        expiresAt,
+      } = req.body ?? {}
+
+      const cleanCode =
+        typeof code === 'string' ? code.trim().toUpperCase() : ''
+      if (!cleanCode || cleanCode.length < 2) {
+        return res
+          .status(400)
+          .json({ error: 'Coupon code must be at least 2 characters.' })
+      }
+
+      const existing = await Coupon.findOne({ code: cleanCode })
+      if (existing) {
+        return res
+          .status(409)
+          .json({ error: `Coupon code "${cleanCode}" already exists.` })
+      }
+
+      const type = ['per_student_rate', 'percentage', 'fixed'].includes(
+        discountType,
+      )
+        ? discountType
+        : 'per_student_rate'
+      const value = Number(discountValue)
+      if (!Number.isFinite(value) || value < 0) {
+        return res
+          .status(400)
+          .json({ error: 'Discount value must be a non-negative number.' })
+      }
+      if (type === 'percentage' && value > 100) {
+        return res
+          .status(400)
+          .json({ error: 'Percentage discount cannot exceed 100%.' })
+      }
+
+      const coupon = await Coupon.create({
+        code: cleanCode,
+        description:
+          typeof description === 'string' ? description.trim() : '',
+        discountType: type,
+        discountValue: value,
+        minStudents: Math.max(0, Number(minStudents) || 0),
+        maxDiscount: maxDiscount ? Math.max(0, Number(maxDiscount)) : null,
+        isActive: isActive !== false,
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+      })
+
+      res.status(201).json({ ok: true, doc: coupon })
+    } catch (err) {
+      next(err)
+    }
+  })
+
   /** PATCH /api/admin/:collection/:id — update a document by _id, bibNumber, or reference. */
   app.patch(
     '/api/admin/:collection/:id',
@@ -453,6 +519,31 @@ export function createApp({
     },
   )
 
+  /** DELETE /api/admin/:collection/:id — delete a document by _id or reference. */
+  app.delete(
+    '/api/admin/:collection/:id',
+    requireAuth,
+    async (req, res, next) => {
+      try {
+        const Model = ADMIN_COLLECTIONS[req.params.collection]
+        if (!Model)
+          return res.status(404).json({ error: 'Unknown collection.' })
+
+        let filter = { _id: req.params.id }
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+          filter = { reference: req.params.id }
+        }
+
+        const doc = await Model.findOneAndDelete(filter).lean()
+        if (!doc) return res.status(404).json({ error: 'Record not found.' })
+
+        res.json({ ok: true, doc })
+      } catch (err) {
+        next(err)
+      }
+    },
+  )
+
   /** GET /api/participants/bib/:bibNumber — public/race day lookup by unique participant bib ID. */
   app.get('/api/participants/bib/:bibNumber', async (req, res, next) => {
     try {
@@ -503,6 +594,31 @@ export function createApp({
 
         if (!doc)
           return res.status(404).json({ error: 'Participant not found.' })
+        res.json({ ok: true, doc })
+      } catch (err) {
+        next(err)
+      }
+    },
+  )
+
+  /** DELETE /api/admin/:collection/:id — delete a document by _id or reference. */
+  app.delete(
+    '/api/admin/:collection/:id',
+    requireAuth,
+    async (req, res, next) => {
+      try {
+        const Model = ADMIN_COLLECTIONS[req.params.collection]
+        if (!Model)
+          return res.status(404).json({ error: 'Unknown collection.' })
+
+        let filter = { _id: req.params.id }
+        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+          filter = { reference: req.params.id }
+        }
+
+        const doc = await Model.findOneAndDelete(filter).lean()
+        if (!doc) return res.status(404).json({ error: 'Record not found.' })
+
         res.json({ ok: true, doc })
       } catch (err) {
         next(err)

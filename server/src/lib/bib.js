@@ -6,10 +6,10 @@
  *    - First digit = Category Prefix.
  *    - Last 3 digits = Serial Number.
  * 2. Categories & Ranges:
- *    - Mini FITKIDROX (ages 3–5): Prefix 1, Range 1001–1250, Heat Size 8
- *    - Kids Fitness Challenge (ages 6–8): Prefix 2, Range 2001–2400, Heat Size 10
- *    - Athletic Challenge (ages 9–12): Prefix 3, Range 3001–3400, Heat Size 10
- *    - Performance FITKIDROX (ages 13+): Prefix 4, Range 4001–4200, Heat Size 8
+ *    - Mini Rox (ages 3–5): Prefix 1, Range 1001–1250, Heat Size 8
+ *    - Junior Rox (ages 6–8): Prefix 2, Range 2001–2400, Heat Size 10
+ *    - Rising Rox (ages 9–12): Prefix 3, Range 3001–3400, Heat Size 10
+ *    - Senior Rox (ages 13+): Prefix 4, Range 4001–4200, Heat Size 8
  * 3. Reserved Numbers:
  *    - The last 50 numbers of each category range are reserved for late
  *      registrations and replacement bibs (per race plan).
@@ -23,8 +23,8 @@
  */
 
 export const DEFAULT_BIB_CONFIG = {
-  'Mini FITKIDROX': {
-    name: 'Mini FITKIDROX',
+  'Mini Rox': {
+    name: 'Mini Rox',
     ages: '3–5 years',
     prefix: 1,
     minBib: 1001,
@@ -32,8 +32,8 @@ export const DEFAULT_BIB_CONFIG = {
     reservedCount: 50,
     heatSize: 8,
   },
-  'Kids Fitness Challenge': {
-    name: 'Kids Fitness Challenge',
+  'Junior Rox': {
+    name: 'Junior Rox',
     ages: '6–8 years',
     prefix: 2,
     minBib: 2001,
@@ -41,8 +41,8 @@ export const DEFAULT_BIB_CONFIG = {
     reservedCount: 50,
     heatSize: 10,
   },
-  'Athletic Challenge': {
-    name: 'Athletic Challenge',
+  'Rising Rox': {
+    name: 'Rising Rox',
     ages: '9–12 years',
     prefix: 3,
     minBib: 3001,
@@ -50,8 +50,8 @@ export const DEFAULT_BIB_CONFIG = {
     reservedCount: 50,
     heatSize: 10,
   },
-  'Performance FITKIDROX': {
-    name: 'Performance FITKIDROX',
+  'Senior Rox': {
+    name: 'Senior Rox',
     ages: '13+ years',
     prefix: 4,
     minBib: 4001,
@@ -60,6 +60,12 @@ export const DEFAULT_BIB_CONFIG = {
     heatSize: 8,
   },
 }
+
+// Backward compatibility aliases for existing data and tests
+DEFAULT_BIB_CONFIG['Mini FITKIDROX'] = DEFAULT_BIB_CONFIG['Mini Rox']
+DEFAULT_BIB_CONFIG['Kids Fitness Challenge'] = DEFAULT_BIB_CONFIG['Junior Rox']
+DEFAULT_BIB_CONFIG['Athletic Challenge'] = DEFAULT_BIB_CONFIG['Rising Rox']
+DEFAULT_BIB_CONFIG['Performance FITKIDROX'] = DEFAULT_BIB_CONFIG['Senior Rox']
 
 let activeBibConfig = { ...DEFAULT_BIB_CONFIG }
 
@@ -88,16 +94,31 @@ export function resolveCategoryConfig(categoryInput, dob) {
       }
     }
     if (s.includes('mini') || s.includes('3–5') || s.includes('3-5')) {
-      return activeBibConfig['Mini FITKIDROX']
+      return activeBibConfig['Mini Rox'] || activeBibConfig['Mini FITKIDROX']
     }
-    if (s.includes('kids') || s.includes('6–8') || s.includes('6-8')) {
-      return activeBibConfig['Kids Fitness Challenge']
+    if (
+      s.includes('junior') ||
+      s.includes('kids') ||
+      s.includes('6–8') ||
+      s.includes('6-8')
+    ) {
+      return activeBibConfig['Junior Rox'] || activeBibConfig['Kids Fitness Challenge']
     }
-    if (s.includes('athletic') || s.includes('9–12') || s.includes('9-12')) {
-      return activeBibConfig['Athletic Challenge']
+    if (
+      s.includes('rising') ||
+      s.includes('athletic') ||
+      s.includes('9–12') ||
+      s.includes('9-12')
+    ) {
+      return activeBibConfig['Rising Rox'] || activeBibConfig['Athletic Challenge']
     }
-    if (s.includes('performance') || s.includes('13+') || s.includes('13')) {
-      return activeBibConfig['Performance FITKIDROX']
+    if (
+      s.includes('senior') ||
+      s.includes('performance') ||
+      s.includes('13+') ||
+      s.includes('13')
+    ) {
+      return activeBibConfig['Senior Rox'] || activeBibConfig['Performance FITKIDROX']
     }
   }
 
@@ -109,10 +130,10 @@ export function resolveCategoryConfig(categoryInput, dob) {
       const m = eventDate.getMonth() - birth.getMonth()
       if (m < 0 || (m === 0 && eventDate.getDate() < birth.getDate())) age--
 
-      if (age >= 3 && age <= 5) return activeBibConfig['Mini FITKIDROX']
-      if (age >= 6 && age <= 8) return activeBibConfig['Kids Fitness Challenge']
-      if (age >= 9 && age <= 12) return activeBibConfig['Athletic Challenge']
-      if (age >= 13) return activeBibConfig['Performance FITKIDROX']
+      if (age >= 3 && age <= 5) return activeBibConfig['Mini Rox'] || activeBibConfig['Mini FITKIDROX']
+      if (age >= 6 && age <= 8) return activeBibConfig['Junior Rox'] || activeBibConfig['Kids Fitness Challenge']
+      if (age >= 9 && age <= 12) return activeBibConfig['Rising Rox'] || activeBibConfig['Athletic Challenge']
+      if (age >= 13) return activeBibConfig['Senior Rox'] || activeBibConfig['Performance FITKIDROX']
     }
   }
 

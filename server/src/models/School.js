@@ -71,6 +71,23 @@ const SchoolSchema = new Schema(
 
     participants: { type: Number, required: true, min: 1 },
     roster: { type: [RosterEntrySchema], default: [] },
+
+    couponCode: { type: String, trim: true, uppercase: true, default: '' },
+    grossAmount: { type: Number, default: 0 },
+    discountAmount: { type: Number, default: 0 },
+
+    payment: {
+      status: {
+        type: String,
+        enum: ['unpaid', 'paid', 'waived', 'failed'],
+        default: 'unpaid',
+        index: true,
+      },
+      amount: { type: Number, default: 0 },
+      orderId: { type: String, trim: true, default: '' },
+      paymentId: { type: String, trim: true, default: '' },
+      paidAt: { type: Date },
+    },
   },
   { timestamps: { createdAt: true, updatedAt: true } },
 )

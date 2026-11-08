@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/sheet'
 import { useAuth } from '@/lib/auth-context'
 import { GoogleIcon } from './google-icon'
+import { InstagramIcon, INSTAGRAM_URL } from './instagram-icon'
 import { Logo } from './logo'
 import { WhatsAppIcon, WHATSAPP_ENQUIRY_URL } from './whatsapp-icon'
 
@@ -90,6 +91,19 @@ export function SiteHeader() {
             <WhatsAppIcon className="size-6 shrink-0" />
             <span>Enquire</span>
           </a>
+
+          {/* Instagram icon */}
+          <a
+            href={INSTAGRAM_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Follow FITKIDROX on Instagram (@fitkidrox)"
+            title="Follow on Instagram (@fitkidrox)"
+            className="inline-flex items-center gap-2 rounded-full border border-pink-500/30 bg-card px-3 py-1.5 text-sm font-bold text-foreground transition-all hover:border-pink-500 hover:bg-pink-500/10 shadow-xs hover:scale-105"
+          >
+            <InstagramIcon className="size-6 shrink-0" />
+            <span>Instagram</span>
+          </a>
         </nav>
 
         <div className="flex items-center gap-1.5 sm:gap-2">
@@ -104,6 +118,19 @@ export function SiteHeader() {
           >
             <WhatsAppIcon className="size-4 shrink-0" />
             <span className="text-[11px]">Enquire</span>
+          </a>
+
+          {/* Mobile Instagram direct button */}
+          <a
+            href={INSTAGRAM_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Follow FITKIDROX on Instagram (@fitkidrox)"
+            title="Follow on Instagram"
+            className="flex md:hidden items-center gap-1.5 rounded-full border border-pink-500/30 bg-card px-2.5 py-1.5 text-xs font-bold text-foreground transition-all hover:bg-pink-500/10 active:scale-95 shadow-xs"
+          >
+            <InstagramIcon className="size-4 shrink-0" />
+            <span className="text-[11px]">Insta</span>
           </a>
 
           {user ? (
@@ -222,6 +249,17 @@ export function SiteHeader() {
                 >
                   <WhatsAppIcon className="size-6 shrink-0" />
                   <span>Enquire on WhatsApp</span>
+                </a>
+
+                <a
+                  href={INSTAGRAM_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setOpen(false)}
+                  className="mt-2.5 flex items-center justify-center gap-2.5 rounded-xl border border-pink-500/30 bg-pink-500/10 py-3 text-base font-bold text-foreground transition-all hover:bg-pink-500/20"
+                >
+                  <InstagramIcon className="size-6 shrink-0" />
+                  <span>Follow @fitkidrox on Instagram</span>
                 </a>
 
                 {user ? (

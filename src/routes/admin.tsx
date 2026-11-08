@@ -12,10 +12,13 @@ import {
   LogOut,
   Pencil,
   Phone,
+  Plus,
   RefreshCw,
   RotateCcw,
   Save,
   Search,
+  Tag,
+  Trash2,
   UserPlus,
   X,
   XCircle,
@@ -29,6 +32,7 @@ import {
   ageOnEventDay,
   categoryForAge,
 } from '@/data/fixtures'
+import { formatINR } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 export const Route = createFileRoute('/admin')({
@@ -54,7 +58,7 @@ export const Route = createFileRoute('/admin')({
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-type Tab = 'participants' | 'heats' | 'schools' | 'sponsors'
+type Tab = 'participants' | 'heats' | 'schools' | 'sponsors' | 'coupons'
 
 interface Participant {
   _id: string
@@ -102,6 +106,20 @@ interface School {
   phone: string
   email: string
   participants: number
+  couponCode?: string
+  grossAmount?: number
+  discountAmount?: number
+  payment?: {
+    status?: 'unpaid' | 'paid' | 'waived' | 'failed' | string
+    amount?: number
+    orderId?: string
+    paymentId?: string
+    paidAt?: string
+  }
+  paymentStatus?: string
+  paymentAmount?: number
+  'payment.status'?: string
+  'payment.amount'?: number
   createdAt: string
 }
 
@@ -115,6 +133,21 @@ interface Sponsor {
   packageId: string
   message: string
   createdAt: string
+}
+
+export interface Coupon {
+  _id: string
+  code: string
+  description?: string
+  discountType: 'per_student_rate' | 'percentage' | 'fixed'
+  discountValue: number
+  minStudents?: number
+  maxDiscount?: number | null
+  isActive: boolean
+  usageCount: number
+  expiresAt?: string | null
+  createdAt: string
+  updatedAt: string
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -244,6 +277,44 @@ async function apiUpdateRecord<T>(
     )
   }
   const data = (await res.json()) as { ok: boolean; doc: T }
+  return data.doc
+}
+
+async function apiDeleteRecord(collection: string, id: string): Promise<void> {
+  const res = await fetch(`/api/admin/${collection}/${id}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(
+      (data as { error?: string }).error ?? 'Failed to delete record',
+    )
+  }
+}
+
+async function apiCreateCoupon(coupon: {
+  code: string
+  description?: string
+  discountType: 'per_student_rate' | 'percentage' | 'fixed'
+  discountValue: number
+  minStudents?: number
+  maxDiscount?: number | null
+  isActive?: boolean
+}): Promise<Coupon> {
+  const res = await fetch('/api/admin/coupons', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(coupon),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(
+      (data as { error?: string }).error ?? 'Failed to create coupon',
+    )
+  }
+  const data = (await res.json()) as { ok: boolean; doc: Coupon }
   return data.doc
 }
 
@@ -2967,8 +3038,42 @@ function SchoolsTable({
                   >
                     {sc.reference}
                   </button>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    {currentParticipants} students
+                  <div className="flex items-center gap-1.5">
+                    {sc.couponCode && (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded">
+                        <Tag size={9} /> {sc.couponCode}
+                      </span>
+                    )}
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      {currentParticipants} students
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-2 flex items-center justify-between">
+                  <span
+                    className={cn(
+                      'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold',
+                      sc.payment?.status === 'paid'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : sc.payment?.status === 'waived'
+                          ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                          : 'bg-amber-50 text-amber-700 border border-amber-200',
+                    )}
+                  >
+                    {sc.payment?.status === 'paid' ? (
+                      <>
+                        <CheckCircle2 size={10} /> Paid · {formatINR(sc.payment?.amount ?? 0)}
+                      </>
+                    ) : sc.payment?.status === 'waived' ? (
+                      <>
+                        <Check size={10} /> Waived (Coupon)
+                      </>
+                    ) : (
+                      <>
+                        <Clock size={10} /> Unpaid · {formatINR(sc.payment?.amount ?? sc.participants * 1250)}
+                      </>
+                    )}
                   </span>
                 </div>
 
@@ -3111,6 +3216,12 @@ function SchoolsTable({
                 sortDir={sortDir}
                 onSort={handleSort}
               />
+              <th className="px-4 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                Coupon
+              </th>
+              <th className="px-4 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                Payment Status
+              </th>
               <Th
                 label="Registered"
                 field="createdAt"
@@ -3129,7 +3240,7 @@ function SchoolsTable({
             {sorted.length === 0 && (
               <tr>
                 <td
-                  colSpan={editMode ? 9 : 8}
+                  colSpan={editMode ? 11 : 10}
                   className="py-12 text-center text-sm text-slate-500"
                 >
                   No schools found.
@@ -3267,6 +3378,88 @@ function SchoolsTable({
                     ) : (
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-800">
                         {sc.participants} students
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {sc.couponCode ? (
+                      <span className="inline-flex items-center gap-1 font-mono text-xs font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                        <Tag size={10} />
+                        {sc.couponCode}
+                      </span>
+                    ) : (
+                      <span className="text-slate-400 text-xs">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-xs">
+                    {editMode ? (
+                      <div
+                        className="flex items-center gap-1.5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <EditableSelect
+                          value={
+                            draft.paymentStatus !== undefined
+                              ? String(draft.paymentStatus)
+                              : sc.payment?.status || 'unpaid'
+                          }
+                          isDirty={draft.paymentStatus !== undefined}
+                          options={[
+                            { label: 'Unpaid', value: 'unpaid' },
+                            { label: 'Paid', value: 'paid' },
+                            { label: 'Waived', value: 'waived' },
+                            { label: 'Failed', value: 'failed' },
+                          ]}
+                          onChange={(val) =>
+                            updateDraft(sc._id, 'paymentStatus', val)
+                          }
+                        />
+                        <EditableText
+                          type="number"
+                          value={
+                            draft.paymentAmount !== undefined
+                              ? String(draft.paymentAmount)
+                              : String(sc.payment?.amount ?? '')
+                          }
+                          isDirty={draft.paymentAmount !== undefined}
+                          onChange={(val) =>
+                            updateDraft(
+                              sc._id,
+                              'paymentAmount',
+                              val === '' ? 0 : Number(val),
+                            )
+                          }
+                          className="w-20"
+                        />
+                      </div>
+                    ) : (
+                      <span
+                        className={cn(
+                          'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold',
+                          sc.payment?.status === 'paid'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : sc.payment?.status === 'waived'
+                              ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                              : 'bg-amber-50 text-amber-700 border border-amber-200',
+                        )}
+                      >
+                        {sc.payment?.status === 'paid' ? (
+                          <>
+                            <CheckCircle2 size={11} /> Paid ·{' '}
+                            {formatINR(sc.payment?.amount ?? 0)}
+                          </>
+                        ) : sc.payment?.status === 'waived' ? (
+                          <>
+                            <Check size={11} /> Waived (Coupon)
+                          </>
+                        ) : (
+                          <>
+                            <Clock size={11} /> Unpaid ·{' '}
+                            {formatINR(
+                              sc.payment?.amount ?? sc.participants * 1250,
+                            )}
+                          </>
+                        )}
                       </span>
                     )}
                   </td>
@@ -3989,14 +4182,682 @@ function SponsorsTable({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Dashboard Component (Clean, Plain White Theme)
+// Add Coupon Modal
 // ─────────────────────────────────────────────────────────────────────────────
+
+function AddCouponModal({
+  isOpen,
+  onClose,
+  onSuccess,
+}: {
+  isOpen: boolean
+  onClose: () => void
+  onSuccess: (newDoc: Coupon) => void
+}) {
+  const [code, setCode] = useState('')
+  const [description, setDescription] = useState('')
+  const [discountType, setDiscountType] = useState<
+    'per_student_rate' | 'percentage' | 'fixed'
+  >('per_student_rate')
+  const [discountValue, setDiscountValue] = useState('900')
+  const [minStudents, setMinStudents] = useState('1')
+  const [maxDiscount, setMaxDiscount] = useState('')
+  const [isActive, setIsActive] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+
+  if (!isOpen) return null
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const cleanCode = code.trim().toUpperCase()
+    if (!cleanCode) {
+      toast.error('Coupon code is required')
+      return
+    }
+
+    const val = Number(discountValue)
+    if (isNaN(val) || val < 0) {
+      toast.error('Discount value must be 0 or greater')
+      return
+    }
+
+    if (discountType === 'percentage' && val > 100) {
+      toast.error('Percentage discount cannot exceed 100%')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const doc = await apiCreateCoupon({
+        code: cleanCode,
+        description: description.trim() || undefined,
+        discountType,
+        discountValue: val,
+        minStudents: minStudents ? Math.max(1, parseInt(minStudents, 10)) : 1,
+        maxDiscount: maxDiscount ? Number(maxDiscount) : null,
+        isActive,
+      })
+      toast.success('Coupon created successfully!', {
+        description: `Code ${doc.code} is active and ready to use.`,
+      })
+      onSuccess(doc)
+      onClose()
+      setCode('')
+      setDescription('')
+      setDiscountType('per_student_rate')
+      setDiscountValue('900')
+      setMinStudents('1')
+      setMaxDiscount('')
+      setIsActive(true)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to create coupon'
+      toast.error('Error creating coupon', { description: msg })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-6 overflow-y-auto">
+      <div
+        className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Modal Header */}
+        <div className="px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50 shrink-0">
+          <div>
+            <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-1.5 sm:gap-2">
+              Create School Coupon
+            </h3>
+            <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
+              Add a discount or per-student rate for school delegations.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Modal Body */}
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Coupon Code <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. AFFILIATE26, SPORTSWING, VIDYALAYA"
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              className="w-full text-xs tracking-wider px-3 py-2 rounded-md border border-slate-300 focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none"
+            />
+            <p className="text-[11px] text-slate-400 mt-1">
+              Codes are case-insensitive and converted to uppercase.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Description / Notes (Optional)
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. Partner School ₹900/student delegation rate"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full text-xs px-3 py-2 rounded-md border border-slate-300 focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Discount Type
+              </label>
+              <select
+                value={discountType}
+                onChange={(e) => {
+                  const val = e.target.value as
+                    | 'per_student_rate'
+                    | 'percentage'
+                    | 'fixed'
+                  setDiscountType(val)
+                  if (val === 'per_student_rate' && discountValue === '20') {
+                    setDiscountValue('900')
+                  } else if (val === 'percentage' && discountValue === '900') {
+                    setDiscountValue('20')
+                  }
+                }}
+                className="w-full text-xs px-3 py-2 rounded-md border border-slate-300 bg-white focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none cursor-pointer"
+              >
+                <option value="per_student_rate">
+                  Fixed Rate per Student (₹/kid)
+                </option>
+                <option value="percentage">Percentage Off (%)</option>
+                <option value="fixed">Flat Amount Off Total (₹)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                {discountType === 'per_student_rate'
+                  ? 'Cost per Student (₹)'
+                  : discountType === 'percentage'
+                    ? 'Percentage Discount (%)'
+                    : 'Flat Discount (₹)'}{' '}
+                <span className="text-rose-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  min="0"
+                  max={discountType === 'percentage' ? '100' : undefined}
+                  step={discountType === 'percentage' ? '1' : '50'}
+                  required
+                  placeholder={
+                    discountType === 'per_student_rate'
+                      ? '900'
+                      : discountType === 'percentage'
+                        ? '20'
+                        : '500'
+                  }
+                  value={discountValue}
+                  onChange={(e) => setDiscountValue(e.target.value)}
+                  className="w-full text-xs px-3 py-2 rounded-md border border-slate-300 bg-white focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none font-semibold text-slate-900"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-semibold pointer-events-none">
+                  {discountType === 'percentage' ? '%' : '₹'}
+                </span>
+              </div>
+            </div>
+          </div>
+          <p className="text-[11px] text-slate-500 -mt-2">
+            {discountType === 'per_student_rate'
+              ? `Each student will cost ₹${discountValue || 0} instead of standard ₹1,250 (School saves ₹${Math.max(0, 1250 - (Number(discountValue) || 0))}/student).`
+              : discountType === 'percentage'
+                ? 'Percentage deducted from total gross fee.'
+                : 'Flat amount deducted from total delegation fee.'}
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Min. Students Required
+              </label>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                value={minStudents}
+                onChange={(e) => setMinStudents(e.target.value)}
+                placeholder="1"
+                className="w-full text-xs px-3 py-2 rounded-md border border-slate-300 focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">
+                Minimum delegation size to qualify.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Max Discount Cap (₹) (Optional)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-semibold">
+                  ₹
+                </span>
+                <input
+                  type="number"
+                  min="1"
+                  step="100"
+                  value={maxDiscount}
+                  onChange={(e) => setMaxDiscount(e.target.value)}
+                  placeholder="e.g. 5000 (leave blank for none)"
+                  className="w-full text-xs pl-7 pr-3 py-2 rounded-md border border-slate-300 focus:border-slate-900 focus:ring-1 focus:ring-slate-900 outline-none"
+                />
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">
+                Ceiling cap on discount amount.
+              </p>
+            </div>
+          </div>
+
+          <div className="pt-2">
+            <label className="inline-flex items-center gap-2 cursor-pointer text-xs text-slate-700">
+              <input
+                type="checkbox"
+                checked={isActive}
+                onChange={(e) => setIsActive(e.target.checked)}
+                className="rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+              />
+              <span className="font-medium">Active Immediately</span>
+            </label>
+          </div>
+
+          {/* Modal Actions */}
+          <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="px-3.5 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-md transition-colors shadow-xs cursor-pointer disabled:opacity-50"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 size={13} className="animate-spin" />
+                  Creating…
+                </>
+              ) : (
+                <>
+                  <Plus size={13} />
+                  Create Coupon
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Coupons Table Component
+// ─────────────────────────────────────────────────────────────────────────────
+
+function CouponsTable({
+  data,
+  onCreate,
+  onUpdate,
+  onDelete,
+}: {
+  data: Coupon[]
+  onCreate: (coupon: Coupon) => void
+  onUpdate: (id: string, updates: Partial<Coupon>) => Promise<void>
+  onDelete: (id: string) => Promise<void>
+}) {
+  const [query, setQuery] = useState('')
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const filtered = data.filter((c) => {
+    const q = query.toLowerCase().trim()
+    if (!q) return true
+    return (
+      c.code.toLowerCase().includes(q) ||
+      (c.description || '').toLowerCase().includes(q)
+    )
+  })
+
+  const handleToggleStatus = async (coupon: Coupon) => {
+    setTogglingId(coupon._id)
+    try {
+      await onUpdate(coupon._id, { isActive: !coupon.isActive })
+      toast.success(
+        !coupon.isActive
+          ? `Coupon ${coupon.code} activated`
+          : `Coupon ${coupon.code} deactivated`,
+      )
+    } catch (err) {
+      toast.error('Failed to update status', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      })
+    } finally {
+      setTogglingId(null)
+    }
+  }
+
+  const handleDelete = async (coupon: Coupon) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to delete coupon "${coupon.code}"? Schools will no longer be able to use it.`,
+      )
+    ) {
+      return
+    }
+    setDeletingId(coupon._id)
+    try {
+      await onDelete(coupon._id)
+      toast.success(`Coupon ${coupon.code} deleted successfully`)
+    } catch (err) {
+      toast.error('Failed to delete coupon', {
+        description: err instanceof Error ? err.message : 'Unknown error',
+      })
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+      {/* Toolbar */}
+      <div className="p-3 sm:p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
+        <div className="relative flex-1 max-w-md">
+          <Search
+            size={15}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+          />
+          <input
+            id="coupons-search"
+            type="text"
+            placeholder="Search coupon code, description…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="w-full pl-9 pr-8 py-2 sm:py-1.5 text-sm sm:text-xs rounded-md border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
+          />
+          {query && (
+            <button
+              onClick={() => setQuery('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-1"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+          <span className="text-xs text-slate-500">
+            {filtered.length} {filtered.length === 1 ? 'coupon' : 'coupons'}
+          </span>
+          {filtered.length > 0 && (
+            <button
+              id="coupons-export-btn"
+              onClick={() =>
+                exportCsv(
+                  filtered.map((c) => ({
+                    code: c.code,
+                    description: c.description || '',
+                    discountType: c.discountType,
+                    discountValue: c.discountValue,
+                    minStudents: c.minStudents || 1,
+                    maxDiscount: c.maxDiscount || '',
+                    usageCount: c.usageCount || 0,
+                    status: c.isActive ? 'Active' : 'Inactive',
+                  })),
+                  'fitkidrox-coupons.csv',
+                  'coupons',
+                )
+              }
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 border border-slate-300 rounded-md text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 transition-colors cursor-pointer min-h-[34px]"
+            >
+              <Download size={13} /> Export CSV
+            </button>
+          )}
+          <button
+            type="button"
+            id="add-coupon-btn"
+            onClick={() => setShowAddModal(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 sm:py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-md text-xs font-semibold transition-all shadow-xs cursor-pointer min-h-[34px]"
+          >
+            <Plus size={14} />
+            <span>Add Coupon</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Card View (< md) */}
+      <div className="block md:hidden divide-y divide-slate-100">
+        {filtered.length === 0 ? (
+          <div className="p-8 text-center text-slate-400 text-xs">
+            {data.length === 0
+              ? 'No coupons created yet. Click "+ Add Coupon" to create one.'
+              : 'No coupons matching your search.'}
+          </div>
+        ) : (
+          filtered.map((c) => (
+            <div key={c._id} className="p-3.5 space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 font-mono font-bold text-xs px-2.5 py-1 rounded bg-slate-900 text-white tracking-wider">
+                    <Tag size={11} className="text-amber-400" />
+                    {c.code}
+                  </span>
+                  <span
+                    className={cn(
+                      'text-[10px] font-semibold px-2 py-0.5 rounded-full border',
+                      c.isActive
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : 'bg-slate-100 text-slate-500 border-slate-200',
+                    )}
+                  >
+                    {c.isActive ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleStatus(c)}
+                    disabled={togglingId === c._id}
+                    className="text-[11px] font-medium px-2 py-1 rounded border border-slate-200 hover:bg-slate-50 text-slate-700 cursor-pointer disabled:opacity-50"
+                  >
+                    {togglingId === c._id ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : c.isActive ? (
+                      'Deactivate'
+                    ) : (
+                      'Activate'
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(c)}
+                    disabled={deletingId === c._id}
+                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                    title="Delete coupon"
+                  >
+                    {deletingId === c._id ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : (
+                      <Trash2 size={13} />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {c.description && (
+                <div className="text-xs text-slate-600 font-medium">
+                  {c.description}
+                </div>
+              )}
+
+              <div className="grid grid-cols-3 gap-2 text-[11px] bg-slate-50 p-2 rounded border border-slate-100">
+                <div>
+                  <span className="text-slate-400 block text-[10px]">Discount</span>
+                  <span className="font-semibold text-slate-800">
+                    {c.discountType === 'per_student_rate'
+                      ? `${formatINR(c.discountValue)} / student`
+                      : c.discountType === 'percentage'
+                        ? `${c.discountValue}% off`
+                        : `${formatINR(c.discountValue)} flat off`}
+                  </span>
+                  {c.discountType === 'per_student_rate' && (
+                    <span className="text-slate-500 block text-[10px] font-normal">
+                      Save {formatINR(Math.max(0, 1250 - c.discountValue))}/kid
+                    </span>
+                  )}
+                  {c.maxDiscount ? (
+                    <span className="text-slate-500 block text-[10px] font-normal">
+                      Up to {formatINR(c.maxDiscount)}
+                    </span>
+                  ) : null}
+                </div>
+                <div>
+                  <span className="text-slate-400 block text-[10px]">Min. Kids</span>
+                  <span className="font-semibold text-slate-800">
+                    {c.minStudents && c.minStudents > 1
+                      ? `${c.minStudents}`
+                      : '1'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block text-[10px]">Used</span>
+                  <span className="font-semibold text-slate-800">
+                    {c.usageCount || 0} times
+                  </span>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop Table (>= md) */}
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr className="border-b border-slate-200 bg-slate-50/75 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+              <th className="py-2.5 px-3">Code</th>
+              <th className="py-2.5 px-3">Description</th>
+              <th className="py-2.5 px-3">Discount</th>
+              <th className="py-2.5 px-3">Min Students</th>
+              <th className="py-2.5 px-3">Max Cap</th>
+              <th className="py-2.5 px-3">Usage</th>
+              <th className="py-2.5 px-3">Status</th>
+              <th className="py-2.5 px-3 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="py-8 text-center text-slate-400">
+                  {data.length === 0
+                    ? 'No coupons created yet. Click "+ Add Coupon" to create one.'
+                    : 'No coupons matching your search.'}
+                </td>
+              </tr>
+            ) : (
+              filtered.map((c) => (
+                <tr
+                  key={c._id}
+                  className="hover:bg-slate-50/75 transition-colors group"
+                >
+                  <td className="py-2.5 px-3 font-mono font-bold">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-900 text-white text-xs tracking-wider">
+                      <Tag size={12} className="text-amber-400" />
+                      {c.code}
+                    </span>
+                  </td>
+                  <td className="py-2.5 px-3 text-slate-700 max-w-[220px] truncate">
+                    {c.description || (
+                      <span className="text-slate-300">—</span>
+                    )}
+                  </td>
+                  <td className="py-2.5 px-3 font-semibold text-slate-900">
+                    {c.discountType === 'per_student_rate' ? (
+                      <div>
+                        <span className="text-emerald-700 font-bold block">
+                          {formatINR(c.discountValue)} / student
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-normal">
+                          Save {formatINR(Math.max(0, 1250 - c.discountValue))}/kid
+                        </span>
+                      </div>
+                    ) : c.discountType === 'percentage' ? (
+                      <span className="text-emerald-700 font-bold">
+                        {c.discountValue}% off
+                      </span>
+                    ) : (
+                      <span className="text-indigo-700 font-bold">
+                        {formatINR(c.discountValue)} flat off
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-2.5 px-3 text-slate-600">
+                    {c.minStudents && c.minStudents > 1 ? (
+                      <span className="font-medium text-slate-800">
+                        {c.minStudents}+ students
+                      </span>
+                    ) : (
+                      <span className="text-slate-400">1 (Any)</span>
+                    )}
+                  </td>
+                  <td className="py-2.5 px-3 text-slate-600">
+                    {c.maxDiscount ? (
+                      <span className="font-semibold text-slate-700">
+                        {formatINR(c.maxDiscount)}
+                      </span>
+                    ) : (
+                      <span className="text-slate-300">—</span>
+                    )}
+                  </td>
+                  <td className="py-2.5 px-3 text-slate-700">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-700">
+                      {c.usageCount || 0} used
+                    </span>
+                  </td>
+                  <td className="py-2.5 px-3">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleStatus(c)}
+                      disabled={togglingId === c._id}
+                      className={cn(
+                        'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border transition-all cursor-pointer',
+                        c.isActive
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                          : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200',
+                      )}
+                      title="Click to toggle status"
+                    >
+                      {togglingId === c._id ? (
+                        <Loader2 size={10} className="animate-spin" />
+                      ) : c.isActive ? (
+                        <Check size={10} />
+                      ) : (
+                        <X size={10} />
+                      )}
+                      {c.isActive ? 'Active' : 'Inactive'}
+                    </button>
+                  </td>
+                  <td className="py-2.5 px-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(c)}
+                      disabled={deletingId === c._id}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                      title="Delete coupon"
+                    >
+                      {deletingId === c._id ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : (
+                        <Trash2 size={13} />
+                      )}
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <AddCouponModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSuccess={(newDoc) => onCreate(newDoc)}
+      />
+    </div>
+  )
+}
 
 function Dashboard({ onLogout }: { onLogout: () => void }) {
   const [tab, setTab] = useState<Tab>('participants')
   const [participants, setParticipants] = useState<Participant[]>([])
   const [schools, setSchools] = useState<School[]>([])
   const [sponsors, setSponsors] = useState<Sponsor[]>([])
+  const [coupons, setCoupons] = useState<Coupon[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [refreshing, setRefreshing] = useState(false)
@@ -4006,16 +4867,18 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     setRefreshing(true)
     setError('')
     try {
-      const [p, sc, sp] = await Promise.all([
+      const [p, sc, sp, cp] = await Promise.all([
         apiCollection<Participant>('participants'),
         apiCollection<School>('schools'),
         apiCollection<Sponsor>('sponsors'),
+        apiCollection<Coupon>('coupons'),
       ])
       setParticipants(p)
       setSchools(sc)
       setSponsors(sp)
+      setCoupons(cp)
       toast.success('Data refreshed', {
-        description: `Loaded ${p.length} participants, ${sc.length} schools, and ${sp.length} sponsors.`,
+        description: `Loaded ${p.length} participants, ${sc.length} schools, ${sp.length} sponsors, and ${cp.length} coupons.`,
       })
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load data'
@@ -4032,12 +4895,14 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       apiCollection<Participant>('participants'),
       apiCollection<School>('schools'),
       apiCollection<Sponsor>('sponsors'),
+      apiCollection<Coupon>('coupons'),
     ])
-      .then(([p, sc, sp]) => {
+      .then(([p, sc, sp, cp]) => {
         if (!active) return
         setParticipants(p)
         setSchools(sc)
         setSponsors(sp)
+        setCoupons(cp)
         setLoading(false)
       })
       .catch((err) => {
@@ -4119,6 +4984,18 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     )
   }
 
+  const handleUpdateCoupon = async (id: string, updates: Partial<Coupon>) => {
+    const updated = await apiUpdateRecord<Coupon>('coupons', id, updates)
+    setCoupons((prev) =>
+      prev.map((c) => (c._id === id ? { ...c, ...updated } : c)),
+    )
+  }
+
+  const handleDeleteCoupon = async (id: string) => {
+    await apiDeleteRecord('coupons', id)
+    setCoupons((prev) => prev.filter((c) => c._id !== id))
+  }
+
   const handleLogout = async () => {
     await apiLogout()
     toast.success('Signed out', {
@@ -4153,6 +5030,11 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
       id: 'sponsors',
       label: 'Sponsors',
       count: sponsors.length,
+    },
+    {
+      id: 'coupons',
+      label: 'Coupons',
+      count: coupons.length,
     },
   ]
 
@@ -4377,6 +5259,16 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                   editMode={editMode}
                   onToggleEditMode={() => setEditMode((v) => !v)}
                   onUpdate={handleUpdateSponsor}
+                />
+              )}
+              {tab === 'coupons' && (
+                <CouponsTable
+                  data={coupons}
+                  onCreate={(newDoc) =>
+                    setCoupons((prev) => [newDoc, ...prev])
+                  }
+                  onUpdate={handleUpdateCoupon}
+                  onDelete={handleDeleteCoupon}
                 />
               )}
             </div>

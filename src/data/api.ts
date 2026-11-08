@@ -235,6 +235,40 @@ export function loadRazorpayCheckout(): Promise<void> {
   })
 }
 
+export interface CouponValidationResult {
+  valid: boolean
+  code: string
+  description?: string
+  discountType: 'per_student_rate' | 'percentage' | 'fixed'
+  discountValue: number
+  grossAmount: number
+  discountAmount: number
+  finalAmount: number
+  perStudentRate?: number
+}
+
+/** Validates coupon code securely against backend rules and returns calculated discounts. */
+export function validateSchoolCoupon(payload: {
+  code: string
+  participants: number
+}) {
+  return post<CouponValidationResult>('/api/schools/validate-coupon', payload)
+}
+
+/** Creates Razorpay order for the remaining amount of a school delegation. */
+export function createSchoolRazorpayOrder(amountPaise: number, receipt: string) {
+  return post<RazorpayOrder & { waived?: boolean }>('/api/schools/create-order', {
+    amount: amountPaise,
+    currency: 'INR',
+    receipt,
+  })
+}
+
+/** Server-side HMAC check for school delegation payment. */
+export function verifySchoolRazorpayPayment(payload: VerifyPaymentPayload) {
+  return post<VerifyPaymentResponse>('/api/schools/verify-payment', payload)
+}
+
 export interface SchoolRosterEntry {
   name: string
   dob: string
@@ -250,11 +284,20 @@ export interface SchoolSubmission {
   phone: string
   email: string
   participants: number
+  couponCode?: string
   roster?: SchoolRosterEntry[]
 }
 
+export interface SchoolSubmissionResponse {
+  reference: string
+  grossAmount?: number
+  discountAmount?: number
+  finalAmount?: number
+  requiresPayment?: boolean
+}
+
 export function submitSchoolRoster(data: SchoolSubmission) {
-  return post<{ reference: string }>('/api/schools', data)
+  return post<SchoolSubmissionResponse>('/api/schools', data)
 }
 
 export const submitSchoolEntry = submitSchoolRoster

@@ -369,10 +369,18 @@ export async function sendSchoolConfirmationEmail({ school }) {
     school.participants ||
     (Array.isArray(school.roster) ? school.roster.length : 0)
 
-  const title = `${school.schoolName} is registered`
-  const preheader = `Participation request received for ${school.schoolName} (~${approxCount} students). Reference: ${school.reference}.`
+  const title = `${school.schoolName} is registered & confirmed`
+  const preheader = `Registration and payment confirmed for ${school.schoolName} (~${approxCount} students). Reference: ${school.reference}.`
 
-  const descriptionText = `Thank you. We have received your participation request for approximately <strong>${approxCount} students</strong>. Our school partnerships team will contact <strong>${school.coordinator}</strong> within two working days with event slots and coordinator credentials.`
+  const isPaid = school.payment?.status === 'paid'
+  const isWaived = school.payment?.status === 'waived'
+  const paymentText = isPaid
+    ? `₹${Number(school.payment?.amount || 0).toLocaleString('en-IN')} (Paid via Razorpay)`
+    : isWaived
+      ? 'Paid / Waived in Full'
+      : 'Pending Payment'
+
+  const descriptionText = `Thank you! Your school delegation registration and payment have been confirmed for approximately <strong>${approxCount} students</strong>. Soon our official will contact <strong>${school.coordinator}</strong> regarding the details of your registration, event heat slots, parent consent packets, and coordinator credentials.`
 
   const refHighlightedText = `<span style="display: inline-block; font-size: 14px; font-weight: 700; color: #111827; background-color: #F1F5F9; border: 1px solid #E2E8F0; padding: 2px 8px; border-radius: 4px;">${school.reference}</span>`
 
@@ -383,20 +391,30 @@ export async function sendSchoolConfirmationEmail({ school }) {
     { label: 'Coordinator', value: school.coordinator },
     { label: 'Phone', value: `+91 ${school.phone}` },
     { label: 'Estimated Delegation', value: `${approxCount} students` },
+    ...(school.couponCode
+      ? [
+          {
+            label: 'Coupon Code',
+            value: `${school.couponCode}${school.discountAmount ? ` (Saved ₹${Number(school.discountAmount).toLocaleString('en-IN')})` : ''}`,
+          },
+        ]
+      : []),
+    { label: 'Payment Status', value: paymentText },
     { label: 'Event Dates', value: DEFAULT_EVENT.dateLabel },
     { label: 'Venue', value: DEFAULT_EVENT.venue },
   ]
 
   const instructionsText = `
-    <strong>Next Steps:</strong> Our team will share the student roster spreadsheet and briefing packet with ${school.coordinator}. A dedicated school check-in counter will be available on race morning.
+    <strong>Next Steps:</strong> Soon our official will contact ${school.coordinator} regarding your school's registration details, student roster spreadsheet, and race briefing packet. A dedicated school check-in desk will be reserved for ${school.schoolName} on race morning.
   `
 
   const text = `
-${school.schoolName} is registered!
+${school.schoolName} is registered & confirmed!
 
-Thank you. We have received your participation request for approximately ${approxCount} students.
+Thank you! We have received and confirmed your participation request for approximately ${approxCount} students.
 Reference Code: ${school.reference}
-
+Payment Status: ${paymentText}
+${school.couponCode ? `Coupon Applied: ${school.couponCode}\n` : ''}
 School: ${school.schoolName}
 City: ${school.city}
 Coordinator: ${school.coordinator} (+91 ${school.phone})
@@ -405,6 +423,7 @@ Delegation Size: ~${approxCount} students
 Dates: ${DEFAULT_EVENT.dateLabel}
 Venue: ${DEFAULT_EVENT.venue}
 
+Next Steps: Soon our official will contact you regarding the details of your registration.
 Visit: ${DEFAULT_EVENT.website}
 `
 

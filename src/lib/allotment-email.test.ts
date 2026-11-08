@@ -8,7 +8,7 @@ describe('Participant Allotment Email & Safe Mode Simulation', () => {
     childName: 'Oorvi Devgan',
     dob: '2021-05-15',
     gender: 'Girl',
-    category: 'Mini FITKIDROX',
+    category: 'Mini Rox',
     tshirt: 'S (5-6y)',
     school: 'Oakridge International',
     guardianName: 'Ishan Devgan',

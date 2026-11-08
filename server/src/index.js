@@ -38,6 +38,46 @@ try {
       }
     })
     .catch((err) => console.error('Bib backfill error:', err.message))
+
+  // Seed standard coupons for schools if none exist
+  const { Coupon } = await import('./models/Coupon.js')
+  Coupon.countDocuments()
+    .then(async (count) => {
+      if (count === 0) {
+        await Coupon.create([
+          {
+            code: 'AFFILIATE26',
+            description: 'Partner School Delegation Rate (₹900 per student)',
+            discountType: 'per_student_rate',
+            discountValue: 900,
+            isActive: true,
+          },
+          {
+            code: 'SPORTSWING',
+            description: 'Institutional Sports Council Rate (₹700 per student)',
+            discountType: 'per_student_rate',
+            discountValue: 700,
+            isActive: true,
+          },
+          {
+            code: 'VIDYALAYA',
+            description: 'Subsidized Community School Rate (₹500 per student)',
+            discountType: 'per_student_rate',
+            discountValue: 500,
+            isActive: true,
+          },
+          {
+            code: 'SCHOLARPASS',
+            description: '100% Scholarship / Direct Delegation Pass (₹0 per student)',
+            discountType: 'per_student_rate',
+            discountValue: 0,
+            isActive: true,
+          },
+        ])
+        console.log('Seeded default school discount coupons.')
+      }
+    })
+    .catch((err) => console.error('Coupon seed error:', err.message))
 } catch (err) {
   console.error('Could not connect to MongoDB:', err.message)
   console.error(

@@ -21,9 +21,18 @@ export const EVENT = {
     'Entry fee includes T-shirt, race bib, finisher medal & certificate',
   domain: 'www.fitkidrox.in',
   email: 'hello@fitkidrox.in',
+  instagramUrl: 'https://www.instagram.com/fitkidrox?exln=eWU4ZTA4eXltbnA%3D',
+  instagramHandle: '@fitkidrox',
 } as const
 
-export type CategoryId = 'mini' | 'kids' | 'athletic' | 'performance'
+export type CategoryId =
+  | 'mini'
+  | 'junior'
+  | 'rising'
+  | 'senior'
+  | 'kids'
+  | 'athletic'
+  | 'performance'
 
 export interface Category {
   id: CategoryId
@@ -40,7 +49,7 @@ export interface Category {
 export const CATEGORIES: Category[] = [
   {
     id: 'mini',
-    name: 'Mini FITKIDROX',
+    name: 'Mini Rox',
     ages: '3–5 years',
     minAge: 3,
     maxAge: 5,
@@ -50,8 +59,8 @@ export const CATEGORIES: Category[] = [
     image: '/img/mini.png',
   },
   {
-    id: 'kids',
-    name: 'Kids Fitness Challenge',
+    id: 'junior',
+    name: 'Junior Rox',
     ages: '6–8 years',
     minAge: 6,
     maxAge: 8,
@@ -61,8 +70,8 @@ export const CATEGORIES: Category[] = [
     image: '/img/relay.png',
   },
   {
-    id: 'athletic',
-    name: 'Athletic Challenge',
+    id: 'rising',
+    name: 'Rising Rox',
     ages: '9–12 years',
     minAge: 9,
     maxAge: 12,
@@ -77,8 +86,8 @@ export const CATEGORIES: Category[] = [
     image: '/img/hero.png',
   },
   {
-    id: 'performance',
-    name: 'Performance FITKIDROX',
+    id: 'senior',
+    name: 'Senior Rox',
     ages: '13+ years',
     minAge: 13,
     maxAge: null,
@@ -214,7 +223,7 @@ export const FAQS = [
   },
   {
     q: 'Can parents stay with their child?',
-    a: 'Yes. Parents can accompany Mini FITKIDROX participants on the course and watch every other category from the spectator area.',
+    a: 'Yes. Parents can accompany Mini Rox participants on the course and watch every other category from the spectator area.',
   },
 ]
 

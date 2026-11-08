@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 
 import { PageShell } from '@/components/site/page-shell'
+import { InstagramIcon, INSTAGRAM_URL } from '@/components/site/instagram-icon'
 import { WhatsAppIcon, WHATSAPP_ENQUIRY_URL } from '@/components/site/whatsapp-icon'
 import {
   Accordion,
@@ -109,7 +110,7 @@ const homeStructuredData = [
       addressCountry: 'IN',
     },
     sameAs: [
-      'https://www.instagram.com/fitkidrox',
+      INSTAGRAM_URL,
       'https://www.facebook.com/fitkidrox',
     ],
   },
@@ -407,9 +408,9 @@ function About() {
 
 const QUICK_AGES = [
   { label: '3–5 yrs', age: 4, categoryId: 'mini' },
-  { label: '6–8 yrs', age: 8, categoryId: 'kids' },
-  { label: '9–12 yrs', age: 11, categoryId: 'athletic' },
-  { label: '13+ yrs', age: 14, categoryId: 'performance' },
+  { label: '6–8 yrs', age: 8, categoryId: 'junior' },
+  { label: '9–12 yrs', age: 11, categoryId: 'rising' },
+  { label: '13+ yrs', age: 14, categoryId: 'senior' },
 ]
 
 function Categories() {
@@ -775,18 +776,30 @@ function Faq() {
             </h2>
             <p className="mt-4 text-base text-muted-foreground">
               Have questions about race heats, equipment, or registration? Chat
-              directly with our event coordinators on WhatsApp.
+              directly with our event coordinators on WhatsApp, or follow us on Instagram.
             </p>
-            <a
-              href={WHATSAPP_ENQUIRY_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Enquire on WhatsApp (+91 73895 05338)"
-              className="mt-6 inline-flex items-center gap-2.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-5 py-2.5 text-base font-bold text-foreground transition-all hover:bg-emerald-500/20 shadow-xs"
-            >
-              <WhatsAppIcon className="size-6 shrink-0" />
-              <span>Enquire on WhatsApp</span>
-            </a>
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <a
+                href={WHATSAPP_ENQUIRY_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Enquire on WhatsApp (+91 73895 05338)"
+                className="inline-flex items-center gap-2.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-5 py-2.5 text-base font-bold text-foreground transition-all hover:bg-emerald-500/20 shadow-xs hover:scale-105"
+              >
+                <WhatsAppIcon className="size-6 shrink-0" />
+                <span>Enquire on WhatsApp</span>
+              </a>
+              <a
+                href={INSTAGRAM_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Follow FITKIDROX on Instagram (@fitkidrox)"
+                className="inline-flex items-center gap-2.5 rounded-full border border-pink-500/30 bg-pink-500/10 px-5 py-2.5 text-base font-bold text-foreground transition-all hover:bg-pink-500/20 shadow-xs hover:scale-105"
+              >
+                <InstagramIcon className="size-6 shrink-0" />
+                <span>Follow on Instagram</span>
+              </a>
+            </div>
           </div>
           <Accordion type="single" collapsible className="w-full">
             {FAQS.map((f) => (

@@ -1,7 +1,9 @@
 import { Link } from '@tanstack/react-router'
 
 import { EVENT } from '@/data/fixtures'
+import { InstagramIcon, INSTAGRAM_URL } from './instagram-icon'
 import { Logo } from './logo'
+import { WhatsAppIcon, WHATSAPP_ENQUIRY_URL } from './whatsapp-icon'
 
 export function SiteFooter() {
   return (
@@ -62,6 +64,28 @@ export function SiteFooter() {
                 className="hover:text-primary transition-colors"
               >
                 {EVENT.email}
+              </a>
+            </li>
+            <li>
+              <a
+                href={INSTAGRAM_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 hover:text-pink-400 transition-colors"
+              >
+                <InstagramIcon className="size-4 shrink-0" />
+                <span>Instagram (@fitkidrox)</span>
+              </a>
+            </li>
+            <li>
+              <a
+                href={WHATSAPP_ENQUIRY_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 hover:text-emerald-400 transition-colors"
+              >
+                <WhatsAppIcon className="size-4 shrink-0" />
+                <span>WhatsApp (+91 73895 05338)</span>
               </a>
             </li>
           </ul>
