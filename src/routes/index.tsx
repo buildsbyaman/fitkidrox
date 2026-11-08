@@ -212,9 +212,9 @@ function Hero() {
             <span className="text-primary">Brighter Futures.</span>
           </p>
           <p className="mt-5 max-w-lg text-lg text-muted-foreground">
-            A supervised fitness race for children aged 3 to 13+, inspired by
-            the HYROX format and scaled for every age. Run, crawl, jump, carry
-            and relay with your school.
+            A supervised fitness race for children aged 3 to 13+, designed and
+            scaled for every age. Run, crawl, jump, carry and relay with your
+            school.
           </p>
 
           <div className="mt-7 flex flex-wrap gap-3 text-sm font-semibold">

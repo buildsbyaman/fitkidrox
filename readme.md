@@ -2,7 +2,7 @@
 
 **Young Minds. Stronger Bodies. Brighter Futures.**
 
-The website for FITKIDROX, a school-focused kids' fitness race inspired by the HYROX format. The inaugural flagship event is on 28–29 November 2026 at the Sector 10D Skating Rink, Chandigarh, with four age-based categories from 3 to 13+ years.
+The website for FITKIDROX, a school-focused kids' fitness race designed and scaled for young athletes. The inaugural flagship event is on 28–29 November 2026 at the Sector 10D Skating Rink, Chandigarh, with four age-based categories from 3 to 13+ years.
 
 ## What's live
 

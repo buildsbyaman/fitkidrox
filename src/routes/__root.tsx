@@ -17,7 +17,7 @@ const siteName = 'FITKIDROX by PSSS — Kids Fitness Challenge, Chandigarh 2026'
 const siteDescription =
   'Young Minds. Stronger Bodies. Brighter Futures. FITKIDROX is India’s premier supervised, age-appropriate youth fitness race for children aged 3 to 13+. Join us 28–29 November 2026 at Sector 10D Skating Rink, Chandigarh.'
 const siteKeywords =
-  'FITKIDROX, fitkidrox, kids fitness challenge chandigarh, junior fitness race india, youth fitness race, hyrox for kids india, kids obstacle course chandigarh, sector 10d skating rink chandigarh, tricity kids sports event, mohali kids fitness race, panchkula school sports, children endurance race, PSSS sports foundation'
+  'FITKIDROX, fitkidrox, kids fitness challenge chandigarh, junior fitness race india, youth fitness race, fitness challenge for kids india, kids obstacle course chandigarh, sector 10d skating rink chandigarh, tricity kids sports event, mohali kids fitness race, panchkula school sports, children endurance race, PSSS sports foundation'
 const siteUrl = 'https://www.fitkidrox.in'
 const ogImageUrl = 'https://www.fitkidrox.in/img/hero.png'
 
