@@ -42,40 +42,96 @@ try {
   // Seed standard coupons for schools if none exist
   const { Coupon } = await import('./models/Coupon.js')
   Coupon.countDocuments()
-    .then(async (count) => {
-      if (count === 0) {
-        await Coupon.create([
-          {
-            code: 'AFFILIATE26',
-            description: 'Partner School Delegation Rate (₹900 per student)',
-            discountType: 'per_student_rate',
-            discountValue: 900,
-            isActive: true,
-          },
-          {
-            code: 'SPORTSWING',
-            description: 'Institutional Sports Council Rate (₹700 per student)',
-            discountType: 'per_student_rate',
-            discountValue: 700,
-            isActive: true,
-          },
-          {
-            code: 'VIDYALAYA',
-            description: 'Subsidized Community School Rate (₹500 per student)',
-            discountType: 'per_student_rate',
-            discountValue: 500,
-            isActive: true,
-          },
-          {
-            code: 'SCHOLARPASS',
-            description: '100% Scholarship / Direct Delegation Pass (₹0 per student)',
-            discountType: 'per_student_rate',
-            discountValue: 0,
-            isActive: true,
-          },
-        ])
-        console.log('Seeded default school discount coupons.')
+    .then(async () => {
+      const initialCoupons = [
+        // School delegation coupons
+        {
+          code: 'AFFILIATE26',
+          description: 'Partner School Delegation Rate (₹900 per student)',
+          discountType: 'per_student_rate',
+          discountValue: 900,
+          applicableTo: 'schools',
+          isActive: true,
+        },
+        {
+          code: 'SPORTSWING',
+          description: 'Institutional Sports Council Rate (₹700 per student)',
+          discountType: 'per_student_rate',
+          discountValue: 700,
+          applicableTo: 'schools',
+          isActive: true,
+        },
+        {
+          code: 'VIDYALAYA',
+          description: 'Subsidized Community School Rate (₹500 per student)',
+          discountType: 'per_student_rate',
+          discountValue: 500,
+          applicableTo: 'schools',
+          isActive: true,
+        },
+        {
+          code: 'SCHOLARPASS',
+          description: '100% Scholarship / Direct Delegation Pass (₹0 per student)',
+          discountType: 'per_student_rate',
+          discountValue: 0,
+          applicableTo: 'schools',
+          isActive: true,
+        },
+        // Individual parent registration coupons
+        {
+          code: 'EARLY125',
+          description: 'Early Bird Discount (₹125 OFF)',
+          discountType: 'fixed',
+          discountValue: 125,
+          applicableTo: 'individual',
+          minPriorRegistrations: 0,
+          isActive: true,
+        },
+        {
+          code: 'SIBLING250',
+          description: 'Sibling Discount (₹250 OFF on 2nd child onwards)',
+          discountType: 'fixed',
+          discountValue: 250,
+          applicableTo: 'individual',
+          minPriorRegistrations: 1,
+          isActive: true,
+        },
+        {
+          code: 'GROUP500',
+          description: 'Group Discount (₹500 OFF on 5th child onwards)',
+          discountType: 'fixed',
+          discountValue: 500,
+          applicableTo: 'individual',
+          minPriorRegistrations: 4,
+          isActive: true,
+        },
+        {
+          code: 'FITKID100',
+          description: 'FITKID Promo (₹100 OFF)',
+          discountType: 'fixed',
+          discountValue: 100,
+          applicableTo: 'individual',
+          minPriorRegistrations: 0,
+          isActive: true,
+        },
+        {
+          code: 'DRISHTI900',
+          description: 'Special Parent Rate (₹900 per registration)',
+          discountType: 'per_student_rate',
+          discountValue: 900,
+          applicableTo: 'individual',
+          minPriorRegistrations: 0,
+          isActive: true,
+        },
+      ]
+      for (const c of initialCoupons) {
+        await Coupon.updateOne(
+          { code: c.code },
+          { $setOnInsert: c },
+          { upsert: true },
+        )
       }
+      console.log('Seeded / verified default discount coupons.')
     })
     .catch((err) => console.error('Coupon seed error:', err.message))
 } catch (err) {

@@ -86,10 +86,13 @@ const ParticipantSchema = new Schema(
     consentMedical: { type: Boolean, required: true },
     consentPhotos: { type: Boolean, default: false },
 
+    couponCode: { type: String, trim: true, uppercase: true, default: '' },
+    discountAmount: { type: Number, default: 0 },
+
     payment: {
       status: {
         type: String,
-        enum: ['unpaid', 'paid', 'failed'],
+        enum: ['unpaid', 'paid', 'waived', 'failed'],
         default: 'unpaid',
       },
       amount: { type: Number, default: 1250 },

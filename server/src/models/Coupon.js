@@ -34,6 +34,17 @@ const CouponSchema = new Schema(
       required: true,
       min: 0,
     },
+    applicableTo: {
+      type: String,
+      enum: ['schools', 'individual', 'both'],
+      default: 'both',
+      index: true,
+    },
+    minPriorRegistrations: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
     minStudents: {
       type: Number,
       min: 0,

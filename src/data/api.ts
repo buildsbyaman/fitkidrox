@@ -114,8 +114,10 @@ export interface ParticipantRecord {
   consentParticipation: boolean
   consentMedical: boolean
   consentPhotos: boolean
+  couponCode?: string
+  discountAmount?: number
   payment?: {
-    status?: 'unpaid' | 'paid' | 'failed'
+    status?: 'unpaid' | 'paid' | 'waived' | 'failed'
     amount?: number
     orderId?: string
     paymentId?: string
@@ -151,10 +153,22 @@ export interface ParticipantSubmission {
   consentParticipation: boolean
   consentMedical: boolean
   consentPhotos: boolean
+  couponCode?: string
+}
+
+export interface ParticipantSubmissionResponse {
+  reference: string
+  waived?: boolean
+  bibNumber?: number | null
+  heat?: number | null
+  course?: 'Course A' | 'Course B' | null
+  grossAmount?: number
+  discountAmount?: number
+  finalAmount?: number
 }
 
 export function submitParticipantRegistration(data: ParticipantSubmission) {
-  return post<{ reference: string }>('/api/participants', data)
+  return post<ParticipantSubmissionResponse>('/api/participants', data)
 }
 
 /** @deprecated Use submitParticipantRegistration. */
@@ -245,6 +259,14 @@ export interface CouponValidationResult {
   discountAmount: number
   finalAmount: number
   perStudentRate?: number
+}
+
+/** Validates coupon code securely against backend rules for individual child registration. */
+export function validateParticipantCoupon(payload: { code: string }) {
+  return post<CouponValidationResult>(
+    '/api/participants/validate-coupon',
+    payload,
+  )
 }
 
 /** Validates coupon code securely against backend rules and returns calculated discounts. */

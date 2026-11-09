@@ -11,6 +11,7 @@ import {
 import { assignBibToParticipant } from '../lib/bib.js'
 import { sendParticipantConfirmationEmail } from '../lib/mailer.js'
 import { Participant } from '../models/Participant.js'
+import { Coupon } from '../models/Coupon.js'
 
 export const paymentsRouter = Router()
 
@@ -41,39 +42,73 @@ paymentsRouter.post('/create-order', async (req, res) => {
     return res.status(400).json({ error: 'receipt is required.' })
   }
 
-  // Optional cross-check of the browser's figure — see the note above.
-  if (body.amount !== undefined && body.amount !== null) {
-    const amount = Number(body.amount)
-
-    if (!Number.isFinite(amount) || !Number.isInteger(amount)) {
-      return res
-        .status(400)
-        .json({ error: 'amount must be an integer in paise.' })
-    }
-    if (amount < MIN_AMOUNT_PAISE) {
-      return res
-        .status(400)
-        .json({ error: `amount must be at least ${MIN_AMOUNT_PAISE} paise.` })
-    }
-    if (amount !== ENTRY_FEE_PAISE) {
-      return res
-        .status(400)
-        .json({ error: 'Amount does not match the current entry fee.' })
-    }
-  }
-
   try {
     // Only an existing participant registration can get an order; arbitrary
     // receipts would otherwise create orphan orders against the Razorpay account.
-    const exists = await Participant.exists({ reference: receipt })
-    if (!exists) {
+    const participant = await Participant.findOne({ reference: receipt })
+    if (!participant) {
       return res
         .status(400)
         .json({ error: 'Unknown registration reference.' })
     }
 
+    if (
+      participant.payment?.status === 'paid' ||
+      participant.payment?.status === 'waived'
+    ) {
+      return res
+        .status(400)
+        .json({ error: 'Registration has already been paid.' })
+    }
+
+    const expectedAmount = Number(
+      participant.payment?.amount ?? (ENTRY_FEE_PAISE / 100),
+    )
+    const expectedPaise = Math.round(expectedAmount * 100)
+
+    // If remaining fee is zero or fully waived, mark waived and bypass Razorpay
+    if (expectedPaise <= 0) {
+      await Participant.updateOne(
+        { reference: receipt },
+        {
+          $set: {
+            'payment.status': 'waived',
+            'payment.paidAt': new Date(),
+          },
+        },
+      )
+      return res.json({ waived: true, reference: receipt })
+    }
+
+    if (expectedPaise < MIN_AMOUNT_PAISE) {
+      return res
+        .status(400)
+        .json({ error: `amount must be at least ${MIN_AMOUNT_PAISE} paise.` })
+    }
+
+    // Cross-check of the browser's figure against the registration's recorded fee
+    if (body.amount !== undefined && body.amount !== null) {
+      const amount = Number(body.amount)
+
+      if (!Number.isFinite(amount) || !Number.isInteger(amount)) {
+        return res
+          .status(400)
+          .json({ error: 'amount must be an integer in paise.' })
+      }
+      if (amount < MIN_AMOUNT_PAISE) {
+        return res
+          .status(400)
+          .json({ error: `amount must be at least ${MIN_AMOUNT_PAISE} paise.` })
+      }
+      if (amount !== expectedPaise) {
+        return res
+          .status(400)
+          .json({ error: 'Amount does not match the registration fee.' })
+      }
+    }
+
     const order = await createOrder({
-      amountPaise: ENTRY_FEE_PAISE,
+      amountPaise: expectedPaise,
       receipt,
     })
     await Participant.updateOne(
@@ -207,6 +242,14 @@ paymentsRouter.post('/verify-payment', async (req, res) => {
       ParticipantModel: Participant,
       allowReserved: false,
     })
+
+    // Increment coupon usage count if a coupon was used
+    if (participant.couponCode) {
+      await Coupon.updateOne(
+        { code: participant.couponCode },
+        { $inc: { usageCount: 1 } },
+      ).catch(() => null)
+    }
 
     // Send branded confirmation email to parent/guardian
     sendParticipantConfirmationEmail({

@@ -355,6 +355,8 @@ export function createApp({
         description,
         discountType,
         discountValue,
+        applicableTo,
+        minPriorRegistrations,
         minStudents,
         maxDiscount,
         isActive,
@@ -393,12 +395,18 @@ export function createApp({
           .json({ error: 'Percentage discount cannot exceed 100%.' })
       }
 
+      const appTo = ['schools', 'individual', 'both'].includes(applicableTo)
+        ? applicableTo
+        : 'both'
+
       const coupon = await Coupon.create({
         code: cleanCode,
         description:
           typeof description === 'string' ? description.trim() : '',
         discountType: type,
         discountValue: value,
+        applicableTo: appTo,
+        minPriorRegistrations: Math.max(0, Number(minPriorRegistrations) || 0),
         minStudents: Math.max(0, Number(minStudents) || 0),
         maxDiscount: maxDiscount ? Math.max(0, Number(maxDiscount)) : null,
         isActive: isActive !== false,

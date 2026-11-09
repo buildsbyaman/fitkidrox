@@ -252,8 +252,16 @@ export function buildParticipantAllotmentEmail({
     { label: 'T-Shirt Size', value: participant.tshirt || '—' },
     { label: 'School / Team', value: participant.school || 'Individual Entry' },
     { label: 'Parent / Guardian', value: `${participant.guardianName || '—'} (+91 ${participant.guardianPhone || '—'})` },
+    ...(participant.couponCode
+      ? [
+          {
+            label: 'Coupon Applied',
+            value: `${participant.couponCode}${participant.discountAmount ? ` (Saved ₹${Number(participant.discountAmount).toLocaleString('en-IN')})` : ''}`,
+          },
+        ]
+      : []),
     { label: 'Payment Status', value: paymentConfirmedPill },
-    { label: 'Amount Paid', value: `₹${amountPaid} (Paid)` },
+    { label: 'Amount Paid', value: `₹${amountPaid} (${participant.payment?.status === 'waived' ? 'Waived' : 'Paid'})` },
     { label: 'Event Dates', value: DEFAULT_EVENT.dateLabel },
     { label: 'Venue', value: DEFAULT_EVENT.venue },
   ]
@@ -271,8 +279,8 @@ ${childFirst}’s spot in ${participant.category || 'FITKIDROX'} is officially c
 Bib Number: #${assignedBib}
 Assigned Heat & Course: Heat ${assignedHeat} (${assignedCourse})
 Category: ${participant.category}
-Payment Status: Successfully Confirmed (₹${amountPaid} Paid)
-Amount Paid: ₹${amountPaid} (Paid)
+Payment Status: Successfully Confirmed (₹${amountPaid} ${participant.payment?.status === 'waived' ? 'Waived' : 'Paid'})
+${participant.couponCode ? `Coupon Applied: ${participant.couponCode}${participant.discountAmount ? ` (Saved ₹${participant.discountAmount})` : ''}\n` : ''}Amount Paid: ₹${amountPaid} (${participant.payment?.status === 'waived' ? 'Waived' : 'Paid'})
 
 Dates: ${DEFAULT_EVENT.dateLabel}
 Venue: ${DEFAULT_EVENT.venue}

@@ -36,6 +36,8 @@ async function computeSchoolPricing(participants, couponCodeInput = '') {
       couponError = 'Invalid coupon code.'
     } else if (!coupon.isActive) {
       couponError = 'This coupon is currently inactive.'
+    } else if (coupon.applicableTo === 'individual') {
+      couponError = 'This coupon is valid for individual parent registrations only.'
     } else if (coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) {
       couponError = 'This coupon has expired.'
     } else if (coupon.minStudents && count < coupon.minStudents) {
@@ -134,6 +136,9 @@ schoolsRouter.post('/', async (req, res, next) => {
 
     // Calculate official amounts strictly from backend logic
     const pricing = await computeSchoolPricing(participants, couponCode)
+    if (pricing.couponError) {
+      return res.status(400).json({ error: pricing.couponError })
+    }
     const requiresPayment = pricing.finalAmount > 0
     const initialPaymentStatus = requiresPayment ? 'unpaid' : 'waived'
 
@@ -224,6 +229,21 @@ schoolsRouter.post('/create-order', async (req, res) => {
 
     const amountInRupees = Number(school.payment?.amount ?? 0)
     const amountPaise = Math.round(amountInRupees * 100)
+
+    // Cross-check of the browser's figure against the registration's recorded fee
+    if (body.amount !== undefined && body.amount !== null) {
+      const amount = Number(body.amount)
+      if (!Number.isFinite(amount) || !Number.isInteger(amount)) {
+        return res
+          .status(400)
+          .json({ error: 'amount must be an integer in paise.' })
+      }
+      if (amount !== amountPaise) {
+        return res
+          .status(400)
+          .json({ error: 'Amount does not match the registration fee.' })
+      }
+    }
 
     // If remaining amount is 0, waive and complete immediately
     if (amountPaise <= 0) {

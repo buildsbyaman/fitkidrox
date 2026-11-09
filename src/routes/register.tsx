@@ -6,6 +6,8 @@ import {
   Check,
   CreditCard,
   Loader2,
+  Tag,
+  X,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -37,9 +39,11 @@ import {
   createRazorpayOrder,
   loadRazorpayCheckout,
   submitParticipantRegistration,
+  validateParticipantCoupon,
   verifyRazorpayPayment,
   ApiError,
   type RazorpayOrder,
+  type CouponValidationResult,
 } from '@/data/api'
 import { useAuth } from '@/lib/auth-context'
 import { formatINR } from '@/lib/format'
@@ -179,10 +183,53 @@ function RegisterPage() {
   // duplicate record on retry — the retry pays against the same reference.
   const [createdReference, setCreatedReference] = useState<string | null>(null)
 
+  // Dynamic coupon state (validated against backend rules)
+  const [couponInput, setCouponInput] = useState('')
+  const [appliedCoupon, setAppliedCoupon] =
+    useState<CouponValidationResult | null>(null)
+  const [couponLoading, setCouponLoading] = useState(false)
+  const [couponError, setCouponError] = useState<string | null>(null)
+
   const guardianName = form.guardianName || user?.name || ''
 
   const age = form.dob ? ageOnEventDay(form.dob) : null
   const category = age !== null ? categoryForAge(age) : null
+
+  const grossAmount = EVENT.entryFee
+  const discountAmount = appliedCoupon ? appliedCoupon.discountAmount : 0
+  const finalAmount = Math.max(0, grossAmount - discountAmount)
+
+  async function handleApplyCoupon() {
+    const code = couponInput.trim()
+    if (!code) return
+
+    setCouponLoading(true)
+    setCouponError(null)
+
+    try {
+      const res = await validateParticipantCoupon({ code })
+      setAppliedCoupon(res)
+      toast.success(`Coupon ${res.code} applied!`, {
+        description: `Discount of ${formatINR(res.discountAmount)} applied.`,
+      })
+    } catch (err) {
+      const msg =
+        err instanceof ApiError
+          ? err.message
+          : 'Invalid, expired, or ineligible coupon code.'
+      setCouponError(msg)
+      toast.error(msg)
+    } finally {
+      setCouponLoading(false)
+    }
+  }
+
+  function handleRemoveCoupon() {
+    setAppliedCoupon(null)
+    setCouponInput('')
+    setCouponError(null)
+    toast.info('Coupon code removed.')
+  }
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }))
@@ -236,9 +283,23 @@ function RegisterPage() {
           guardianName,
           guardianEmail: user.email,
           category: category?.name ?? '',
+          couponCode: appliedCoupon?.code,
         })
         reference = res.reference
         setCreatedReference(res.reference)
+
+        if (res.waived) {
+          setReference(res.reference)
+          setBibInfo({
+            bibNumber: res.bibNumber ?? undefined,
+            heat: res.heat ?? undefined,
+            course: res.course ?? undefined,
+          })
+          setSubmitting(false)
+          toast.success('Registration confirmed with 100% coupon waiver!')
+          window.scrollTo({ top: 0, left: 0, behavior: 'smooth' })
+          return
+        }
       } catch (err) {
         toast.error(
           err instanceof ApiError
@@ -262,7 +323,7 @@ function RegisterPage() {
 
     let order: RazorpayOrder
     try {
-      order = await createRazorpayOrder(EVENT.entryFee * 100, reference)
+      order = await createRazorpayOrder(finalAmount * 100, reference)
     } catch (err) {
       toast.error(
         err instanceof ApiError
@@ -376,7 +437,7 @@ function RegisterPage() {
         bibNumber={bibInfo?.bibNumber}
         heat={bibInfo?.heat}
         course={bibInfo?.course}
-        referenceSubtext={`${formatINR(EVENT.entryFee)} paid · Finisher kit reserved`}
+        referenceSubtext={`${formatINR(finalAmount)} ${finalAmount === 0 ? 'waived' : 'paid'} · Finisher kit reserved`}
         recipientEmail={user?.email || ''}
         secondaryAction={{
           label: 'Add a sibling / child',
@@ -387,6 +448,9 @@ function RegisterPage() {
               guardianPhone: form.guardianPhone,
               relation: form.relation,
             })
+            setAppliedCoupon(null)
+            setCouponInput('')
+            setCouponError(null)
             setReference(null)
             setCreatedReference(null)
             setBibInfo(null)
@@ -783,13 +847,108 @@ function RegisterPage() {
                   <p className="text-xs font-bold tracking-widest text-muted-foreground uppercase">
                     Amount due
                   </p>
-                  <p className="font-display mt-1 text-5xl font-black text-foreground">
-                    {formatINR(EVENT.entryFee)}
-                  </p>
+                  <div className="flex items-baseline gap-3 mt-1">
+                    <p className="font-display text-5xl font-black text-foreground">
+                      {formatINR(finalAmount)}
+                    </p>
+                    {discountAmount > 0 && (
+                      <span className="text-2xl font-bold text-muted-foreground line-through">
+                        {formatINR(grossAmount)}
+                      </span>
+                    )}
+                  </div>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Entry for {form.childName} · {category?.name ?? 'FITKIDROX'}{' '}
                     · {EVENT.dateLabel}
                   </p>
+                </div>
+
+                {/* Coupon Code Section */}
+                <div className="rounded-xl border border-border/80 bg-card p-5 shadow-xs">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Tag className="size-4 text-primary" />
+                    <h3 className="text-sm font-bold text-foreground">
+                      Have a coupon code?
+                    </h3>
+                  </div>
+
+                  {appliedCoupon ? (
+                    <div className="flex items-center justify-between gap-3 p-3.5 rounded-lg bg-emerald-50 border border-emerald-200">
+                      <div className="flex items-center gap-2.5">
+                        <div className="size-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 shrink-0 font-bold text-xs">
+                          ✓
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-sm font-bold text-emerald-900 tracking-wider">
+                              {appliedCoupon.code}
+                            </span>
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                              -{formatINR(discountAmount)} applied
+                            </span>
+                          </div>
+                          {appliedCoupon.description && (
+                            <p className="text-xs text-emerald-700 mt-0.5">
+                              {appliedCoupon.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleRemoveCoupon}
+                        className="text-muted-foreground hover:text-destructive h-8 px-2"
+                        title="Remove coupon"
+                      >
+                        <X className="size-4 mr-1" /> Remove
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Enter coupon code"
+                          value={couponInput}
+                          onChange={(e) => {
+                            setCouponInput(e.target.value.toUpperCase())
+                            if (couponError) setCouponError(null)
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault()
+                              handleApplyCoupon()
+                            }
+                          }}
+                          className="font-mono uppercase tracking-wider text-sm bg-background"
+                          disabled={couponLoading || createdReference !== null}
+                        />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={handleApplyCoupon}
+                          disabled={
+                            !couponInput.trim() ||
+                            couponLoading ||
+                            createdReference !== null
+                          }
+                          className="shrink-0 font-semibold"
+                        >
+                          {couponLoading ? (
+                            <Loader2 className="size-4 animate-spin" />
+                          ) : (
+                            'Apply'
+                          )}
+                        </Button>
+                      </div>
+                      {couponError && (
+                        <p className="text-xs font-medium text-destructive mt-1">
+                          {couponError}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -851,12 +1010,17 @@ function RegisterPage() {
                 >
                   {submitting ? (
                     <>
-                      <Loader2 className="animate-spin" /> Processing payment…
+                      <Loader2 className="animate-spin" /> Processing{' '}
+                      {finalAmount === 0 ? 'registration' : 'payment'}…
+                    </>
+                  ) : finalAmount === 0 ? (
+                    <>
+                      <Check /> Confirm Registration (Free Waiver)
                     </>
                   ) : (
                     <>
                       <CreditCard /> Complete payment{' '}
-                      {formatINR(EVENT.entryFee)}
+                      {formatINR(finalAmount)}
                     </>
                   )}
                 </Button>
@@ -901,9 +1065,29 @@ function RegisterPage() {
           <div className="mt-6 flex items-baseline justify-between border-t border-border/70 pt-5">
             <span className="text-sm text-muted-foreground">Entry fee</span>
             <span className="font-display text-3xl font-black text-primary">
-              {formatINR(EVENT.entryFee)}
+              {formatINR(grossAmount)}
             </span>
           </div>
+          {appliedCoupon && (
+            <div className="mt-2 flex items-baseline justify-between text-sm">
+              <span className="text-emerald-600 font-semibold flex items-center gap-1">
+                <Tag className="size-3.5" /> Discount ({appliedCoupon.code})
+              </span>
+              <span className="font-bold text-emerald-600">
+                -{formatINR(discountAmount)}
+              </span>
+            </div>
+          )}
+          {appliedCoupon && (
+            <div className="mt-3 flex items-baseline justify-between border-t border-border/70 pt-3">
+              <span className="text-sm font-bold text-foreground">
+                Total payable
+              </span>
+              <span className="font-display text-3xl font-black text-primary">
+                {formatINR(finalAmount)}
+              </span>
+            </div>
+          )}
           <p className="mt-1 text-xs text-muted-foreground">
             {EVENT.feeStatus}
           </p>
