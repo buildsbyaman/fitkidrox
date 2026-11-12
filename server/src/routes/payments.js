@@ -9,9 +9,9 @@ import {
   verifySignature,
 } from '../lib/razorpay.js'
 import { assignBibToParticipant } from '../lib/bib.js'
+import { syncCouponUsageCount } from '../lib/coupon.js'
 import { sendParticipantConfirmationEmail } from '../lib/mailer.js'
 import { Participant } from '../models/Participant.js'
-import { Coupon } from '../models/Coupon.js'
 
 export const paymentsRouter = Router()
 
@@ -77,6 +77,9 @@ paymentsRouter.post('/create-order', async (req, res) => {
           },
         },
       )
+      if (participant.couponCode) {
+        await syncCouponUsageCount(participant.couponCode).catch(() => null)
+      }
       return res.json({ waived: true, reference: receipt })
     }
 
@@ -243,12 +246,9 @@ paymentsRouter.post('/verify-payment', async (req, res) => {
       allowReserved: false,
     })
 
-    // Increment coupon usage count if a coupon was used
+    // Sync coupon usage count if a coupon was used
     if (participant.couponCode) {
-      await Coupon.updateOne(
-        { code: participant.couponCode },
-        { $inc: { usageCount: 1 } },
-      ).catch(() => null)
+      await syncCouponUsageCount(participant.couponCode).catch(() => null)
     }
 
     // Send branded confirmation email to parent/guardian

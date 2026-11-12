@@ -115,7 +115,11 @@ function DashboardPage() {
 
     let order: RazorpayOrder
     try {
-      order = await createRazorpayOrder(EVENT.entryFee * 100, record.reference)
+      const payableAmount = record.payment?.amount ?? EVENT.entryFee
+      order = await createRazorpayOrder(
+        Math.round(payableAmount * 100),
+        record.reference,
+      )
     } catch (err) {
       toast.error(
         err instanceof ApiError
@@ -368,7 +372,9 @@ function DashboardPage() {
         ) : (
           <div className="mt-8 grid gap-6">
             {registrations.map((record) => {
-              const isPaid = record.payment?.status === 'paid'
+              const isWaived = record.payment?.status === 'waived'
+              const isPaid = record.payment?.status === 'paid' || isWaived
+              const payableAmount = record.payment?.amount ?? EVENT.entryFee
               const calculatedAge = record.dob ? ageOnEventDay(record.dob) : null
 
               return (
@@ -392,6 +398,14 @@ function DashboardPage() {
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">
                         Registration Ref: <strong className="font-mono text-foreground">{record.reference}</strong>
+                        {record.couponCode && (
+                          <>
+                            {' · '}Coupon:{' '}
+                            <strong className="font-mono text-foreground">
+                              {record.couponCode}
+                            </strong>
+                          </>
+                        )}
                       </p>
                     </div>
 
@@ -399,12 +413,17 @@ function DashboardPage() {
                       {isPaid ? (
                         <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
                           <CheckCircle2 className="size-3.5" />
-                          <span>Confirmed · {formatINR(record.payment?.amount ?? EVENT.entryFee)} Paid</span>
+                          <span>
+                            Confirmed ·{' '}
+                            {isWaived
+                              ? '₹0 Waived'
+                              : `${formatINR(payableAmount)} Paid`}
+                          </span>
                         </div>
                       ) : (
                         <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs font-bold text-amber-700 dark:text-amber-300">
                           <Clock className="size-3.5" />
-                          <span>Payment Pending · {formatINR(EVENT.entryFee)}</span>
+                          <span>Payment Pending · {formatINR(payableAmount)}</span>
                         </div>
                       )}
                     </div>
@@ -487,7 +506,7 @@ function DashboardPage() {
                           ) : (
                             <>
                               <CreditCard className="size-3.5" />
-                              <span>Pay {formatINR(EVENT.entryFee)}</span>
+                              <span>Pay {formatINR(payableAmount)}</span>
                             </>
                           )}
                         </Button>

@@ -1,5 +1,7 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { formatINR } from '../lib/format'
+// @ts-expect-error server code is plain JavaScript without d.ts
+import { syncCouponUsageCount, syncAllCouponUsageCounts } from '../../server/src/lib/coupon.js'
 
 describe('School Coupon & Pricing Engine', () => {
   const BASE_FEE = 1250
@@ -508,6 +510,83 @@ describe('Server-Side Payment & Amount Validation (Zero Client Trust)', () => {
     })
     expect(res.status).toBe(400)
     expect(res.error).toBe('amount must be an integer in paise.')
+  })
+})
+
+describe('Coupon Usage Count Synchronization', () => {
+  it('syncCouponUsageCount computes exact total across Participant and School records', async () => {
+    const updateOne = vi.fn().mockResolvedValue({ modifiedCount: 1 })
+    const participantCountDocuments = vi.fn().mockResolvedValue(2)
+    const schoolCountDocuments = vi.fn().mockResolvedValue(1)
+
+    const total = await syncCouponUsageCount(' scholarpass ', {
+      CouponModel: { updateOne },
+      ParticipantModel: { countDocuments: participantCountDocuments },
+      SchoolModel: { countDocuments: schoolCountDocuments },
+    })
+
+    expect(total).toBe(3)
+    expect(participantCountDocuments).toHaveBeenCalledWith({
+      couponCode: 'SCHOLARPASS',
+      'payment.status': { $in: ['paid', 'waived'] },
+    })
+    expect(schoolCountDocuments).toHaveBeenCalledWith({
+      couponCode: 'SCHOLARPASS',
+      'payment.status': { $in: ['paid', 'waived'] },
+    })
+    expect(updateOne).toHaveBeenCalledWith(
+      { code: 'SCHOLARPASS' },
+      { $set: { usageCount: 3 } },
+    )
+  })
+
+  it('syncCouponUsageCount resets usageCount to 0 when no live paid/waived records remain', async () => {
+    const updateOne = vi.fn().mockResolvedValue({ modifiedCount: 1 })
+
+    const total = await syncCouponUsageCount('SCHOLARPASS', {
+      CouponModel: { updateOne },
+      ParticipantModel: { countDocuments: vi.fn().mockResolvedValue(0) },
+      SchoolModel: { countDocuments: vi.fn().mockResolvedValue(0) },
+    })
+
+    expect(total).toBe(0)
+    expect(updateOne).toHaveBeenCalledWith(
+      { code: 'SCHOLARPASS' },
+      { $set: { usageCount: 0 } },
+    )
+  })
+
+  it('syncAllCouponUsageCounts reconciles stale counts across all coupons', async () => {
+    const updateOne = vi.fn().mockResolvedValue({ modifiedCount: 1 })
+    const find = vi.fn().mockReturnValue({
+      lean: vi.fn().mockResolvedValue([
+        { _id: '1', code: 'SCHOLARPASS', usageCount: 1 },
+        { _id: '2', code: 'TLG100', usageCount: 0 },
+        { _id: '3', code: 'EARLY125', usageCount: 1 },
+      ]),
+    })
+    const participantAggregate = vi.fn().mockResolvedValue([
+      { _id: 'TLG100', count: 2 },
+      { _id: 'EARLY125', count: 1 },
+    ])
+    const schoolAggregate = vi.fn().mockResolvedValue([])
+
+    const updated = await syncAllCouponUsageCounts({
+      CouponModel: { find, updateOne },
+      ParticipantModel: { aggregate: participantAggregate },
+      SchoolModel: { aggregate: schoolAggregate },
+    })
+
+    expect(updated).toBe(2)
+    expect(updateOne).toHaveBeenCalledTimes(2)
+    expect(updateOne).toHaveBeenCalledWith(
+      { _id: '1' },
+      { $set: { usageCount: 0 } },
+    )
+    expect(updateOne).toHaveBeenCalledWith(
+      { _id: '2' },
+      { $set: { usageCount: 2 } },
+    )
   })
 })
 

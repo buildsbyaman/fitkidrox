@@ -130,7 +130,15 @@ try {
           { $setOnInsert: c },
           { upsert: true },
         )
+        if (c.applicableTo) {
+          await Coupon.updateOne(
+            { code: c.code, applicableTo: { $exists: false } },
+            { $set: { applicableTo: c.applicableTo } },
+          )
+        }
       }
+      const { syncAllCouponUsageCounts } = await import('./lib/coupon.js')
+      await syncAllCouponUsageCounts()
       console.log('Seeded / verified default discount coupons.')
     })
     .catch((err) => console.error('Coupon seed error:', err.message))

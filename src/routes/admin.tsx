@@ -466,6 +466,26 @@ function getNestedValue(obj: unknown, path: string): unknown {
   }, obj)
 }
 
+function getParticipantPaymentInfo(
+  p: Participant,
+  overrideStatus?: string,
+  overrideAmount?: unknown,
+) {
+  const status = String(
+    overrideStatus ?? p.payment?.status ?? 'unpaid',
+  ).toLowerCase()
+  const discount = Math.max(0, Number(p.discountAmount) || 0)
+  const rawFee =
+    overrideAmount !== undefined && overrideAmount !== ''
+      ? Number(overrideAmount)
+      : p.payment?.amount !== undefined && p.payment?.amount !== null
+        ? Number(p.payment.amount)
+        : Math.max(0, 1250 - discount)
+  const feeAmount = Number.isFinite(rawFee) ? Math.max(0, rawFee) : 1250
+  const amountPaid = status === 'paid' ? feeAmount : 0
+  return { status, feeAmount, amountPaid, discount }
+}
+
 function PaymentBadge({ status }: { status?: string }) {
   const s = (status || 'unpaid').toLowerCase()
   if (s === 'paid') {
@@ -473,6 +493,14 @@ function PaymentBadge({ status }: { status?: string }) {
       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
         <CheckCircle2 size={12} className="text-emerald-600" />
         Paid
+      </span>
+    )
+  }
+  if (s === 'waived') {
+    return (
+      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+        <CheckCircle2 size={12} className="text-purple-600" />
+        Waived
       </span>
     )
   }
@@ -1196,8 +1224,11 @@ function ParticipantsTable({
   const filteredByPayment = data.filter((p) => {
     if (paymentFilter === 'all') return true
     const status = (p.payment?.status || 'unpaid').toLowerCase()
+    if (paymentFilter === 'paid') {
+      return status === 'paid' || status === 'waived'
+    }
     if (paymentFilter === 'unpaid') {
-      return status !== 'paid'
+      return status !== 'paid' && status !== 'waived'
     }
     return status === paymentFilter
   })
@@ -1215,9 +1246,10 @@ function ParticipantsTable({
   const [showAddModal, setShowAddModal] = useState(false)
 
   const dirtyCount = Object.keys(drafts).length
-  const paidCount = data.filter(
-    (p) => (p.payment?.status || '').toLowerCase() === 'paid',
-  ).length
+  const paidCount = data.filter((p) => {
+    const status = (p.payment?.status || '').toLowerCase()
+    return status === 'paid' || status === 'waived'
+  }).length
   const unpaidCount = data.length - paidCount
 
   const updateDraft = (id: string, field: keyof Participant, val: unknown) => {
@@ -1393,6 +1425,7 @@ function ParticipantsTable({
                 exportCsv(
                   sorted.map((item) => {
                     const p = item as unknown as Participant
+                    const paymentInfo = getParticipantPaymentInfo(p)
                     return {
                       bibNumber: p.bibNumber ? `#${p.bibNumber}` : 'Unassigned',
                       entryType: p.isManual ? 'Manual' : 'Online',
@@ -1409,8 +1442,11 @@ function ParticipantsTable({
                       guardianPhone: p.guardianPhone,
                       guardianEmail: p.guardianEmail,
                       relation: p.relation,
+                      couponCode: p.couponCode || '',
+                      discountAmount: paymentInfo.discount,
                       paymentStatus: p.payment?.status || 'unpaid',
-                      paymentAmount: p.payment?.amount ?? 1250,
+                      amountPaid: paymentInfo.amountPaid,
+                      registrationFee: paymentInfo.feeAmount,
                       paidAt: p.payment?.paidAt || '',
                       registeredAt: p.createdAt,
                     }
@@ -1492,12 +1528,12 @@ function ParticipantsTable({
                 : (draft['payment.status'] as string | undefined) !== undefined
                   ? (draft['payment.status'] as string)
                   : p.payment?.status || 'unpaid'
-            const currentPaymentAmount =
-              draft.paymentAmount !== undefined
-                ? draft.paymentAmount
-                : p.payment?.amount !== undefined
-                  ? p.payment.amount
-                  : 1250
+            const paymentInfo = getParticipantPaymentInfo(
+              p,
+              currentPaymentStatus,
+              draft.paymentAmount,
+            )
+            const currentPaymentAmount = paymentInfo.feeAmount
             const currentChildName =
               draft.childName !== undefined ? draft.childName : p.childName
             const currentDob = draft.dob !== undefined ? draft.dob : p.dob
@@ -1560,7 +1596,7 @@ function ParticipantsTable({
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap justify-end">
                     {p.couponCode && (
                       <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
                         <Tag size={9} />
@@ -1568,8 +1604,24 @@ function ParticipantsTable({
                       </span>
                     )}
                     <PaymentBadge status={currentPaymentStatus} />
-                    <span className="text-xs font-bold text-slate-800">
-                      ₹{Number(currentPaymentAmount).toLocaleString('en-IN')}
+                    <span
+                      className={cn(
+                        'text-xs font-bold',
+                        paymentInfo.status === 'paid'
+                          ? 'text-emerald-700'
+                          : paymentInfo.status === 'waived'
+                            ? 'text-purple-700'
+                            : 'text-slate-400',
+                      )}
+                      title={
+                        paymentInfo.status === 'paid'
+                          ? 'Amount Paid'
+                          : paymentInfo.status === 'waived'
+                            ? '100% Waived'
+                            : `Fee Due: ₹${paymentInfo.feeAmount.toLocaleString('en-IN')}`
+                      }
+                    >
+                      ₹{paymentInfo.amountPaid.toLocaleString('en-IN')}
                     </span>
                   </div>
                 </div>
@@ -1679,6 +1731,7 @@ function ParticipantsTable({
                           isDirty={draft.paymentStatus !== undefined || draft['payment.status'] !== undefined}
                           options={[
                             { label: 'Paid', value: 'paid' },
+                            { label: 'Waived', value: 'waived' },
                             { label: 'Unpaid', value: 'unpaid' },
                             { label: 'Failed', value: 'failed' },
                           ]}
@@ -1801,6 +1854,25 @@ function ParticipantsTable({
                           <span className="text-slate-800 font-medium">{p.school || 'None'}</span>
                         </div>
                         <div>
+                          <span className="text-slate-400 text-[10px] font-semibold uppercase block">Amount Paid</span>
+                          <span className="text-slate-800 font-semibold">
+                            ₹{paymentInfo.amountPaid.toLocaleString('en-IN')}
+                            {paymentInfo.status !== 'paid' && paymentInfo.status !== 'waived'
+                              ? ` (Due: ₹${paymentInfo.feeAmount.toLocaleString('en-IN')})`
+                              : paymentInfo.status === 'waived'
+                                ? ' (Waived)'
+                                : ''}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 text-[10px] font-semibold uppercase block">Coupon Code</span>
+                          <span className="text-slate-800 font-mono font-semibold">
+                            {p.couponCode
+                              ? `${p.couponCode}${paymentInfo.discount > 0 ? ` (-₹${paymentInfo.discount.toLocaleString('en-IN')})` : ''}`
+                              : 'None'}
+                          </span>
+                        </div>
+                        <div>
                           <span className="text-slate-400 text-[10px] font-semibold uppercase block">Payment ID</span>
                           <span className="text-slate-800 font-mono text-[11px]">{p.payment?.paymentId || '—'}</span>
                         </div>
@@ -1847,6 +1919,20 @@ function ParticipantsTable({
               <Th
                 label="Payment"
                 field="payment.status"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={handleSort}
+              />
+              <Th
+                label="Amount Paid"
+                field="payment.amount"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={handleSort}
+              />
+              <Th
+                label="Coupon"
+                field="couponCode"
                 sortKey={sortKey}
                 sortDir={sortDir}
                 onSort={handleSort}
@@ -1946,7 +2032,7 @@ function ParticipantsTable({
             {sorted.length === 0 && (
               <tr>
                 <td
-                  colSpan={editMode ? 16 : 15}
+                  colSpan={editMode ? 17 : 16}
                   className="py-12 text-center text-sm text-slate-500"
                 >
                   No participants found.
@@ -1962,12 +2048,12 @@ function ParticipantsTable({
                   : (draft['payment.status'] as string | undefined) !== undefined
                     ? (draft['payment.status'] as string)
                     : p.payment?.status || 'unpaid'
-              const currentPaymentAmount =
-                draft.paymentAmount !== undefined
-                  ? draft.paymentAmount
-                  : p.payment?.amount !== undefined
-                    ? p.payment.amount
-                    : 1250
+              const paymentInfo = getParticipantPaymentInfo(
+                p,
+                currentPaymentStatus,
+                draft.paymentAmount,
+              )
+              const currentPaymentAmount = paymentInfo.feeAmount
               const currentChildName =
                 draft.childName !== undefined ? draft.childName : p.childName
               const currentDob = draft.dob !== undefined ? draft.dob : p.dob
@@ -2049,6 +2135,7 @@ function ParticipantsTable({
                           }
                           options={[
                             { label: 'Paid', value: 'paid' },
+                            { label: 'Waived', value: 'waived' },
                             { label: 'Unpaid', value: 'unpaid' },
                             { label: 'Failed', value: 'failed' },
                           ]}
@@ -2096,18 +2183,57 @@ function ParticipantsTable({
                         )}
                       </div>
                     ) : (
-                      <div className="flex flex-col gap-0.5">
-                        <PaymentBadge status={currentPaymentStatus} />
-                        <span className="text-[11px] font-semibold text-slate-600">
-                          ₹{Number(currentPaymentAmount).toLocaleString('en-IN')}
+                      <PaymentBadge status={currentPaymentStatus} />
+                    )}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <div className="flex flex-col gap-0.5">
+                      <span
+                        className={cn(
+                          'text-xs font-semibold',
+                          paymentInfo.status === 'paid'
+                            ? 'text-emerald-700'
+                            : paymentInfo.status === 'waived'
+                              ? 'text-purple-700'
+                              : 'text-slate-400',
+                        )}
+                      >
+                        ₹{paymentInfo.amountPaid.toLocaleString('en-IN')}
+                      </span>
+                      {paymentInfo.status === 'paid' &&
+                        paymentInfo.discount > 0 && (
+                          <span className="text-[10px] text-slate-500">
+                            Saved ₹{paymentInfo.discount.toLocaleString('en-IN')}
+                          </span>
+                        )}
+                      {paymentInfo.status === 'waived' && (
+                        <span className="text-[10px] text-purple-600">
+                          100% waived
                         </span>
-                        {p.couponCode && (
-                          <span className="inline-flex items-center gap-1 font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 w-fit">
-                            <Tag size={9} />
-                            {p.couponCode}
+                      )}
+                      {paymentInfo.status !== 'paid' &&
+                        paymentInfo.status !== 'waived' && (
+                          <span className="text-[10px] text-amber-700">
+                            Due: ₹{paymentInfo.feeAmount.toLocaleString('en-IN')}
+                          </span>
+                        )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {p.couponCode ? (
+                      <div className="flex flex-col gap-0.5">
+                        <span className="inline-flex items-center gap-1 font-mono text-xs font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 w-fit">
+                          <Tag size={10} />
+                          {p.couponCode}
+                        </span>
+                        {paymentInfo.discount > 0 && (
+                          <span className="text-[10px] text-emerald-700 font-medium">
+                            -₹{paymentInfo.discount.toLocaleString('en-IN')} off
                           </span>
                         )}
                       </div>
+                    ) : (
+                      <span className="text-slate-400 text-xs">—</span>
                     )}
                   </td>
                   <td className="px-4 py-3 font-medium text-slate-900 whitespace-nowrap">
@@ -2376,7 +2502,7 @@ function ParticipantsTable({
               if (expanded === p._id) {
                 rows.push(
                   <tr key={`${p._id}-expanded`}>
-                    <td colSpan={editMode ? 13 : 12} className="p-0">
+                    <td colSpan={editMode ? 17 : 16} className="p-0">
                       <div className="bg-slate-50 px-6 py-4 border-t border-b border-slate-200">
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
                           <div>
@@ -2450,13 +2576,33 @@ function ParticipantsTable({
                           </div>
                           <div>
                             <span className="text-slate-400 block font-medium">
+                              Amount Paid
+                            </span>
+                            <span className="text-slate-800 font-semibold text-xs">
+                              ₹{paymentInfo.amountPaid.toLocaleString('en-IN')}
+                              {paymentInfo.status === 'waived'
+                                ? ' (Waived)'
+                                : paymentInfo.status !== 'paid'
+                                  ? ` (Due: ₹${paymentInfo.feeAmount.toLocaleString('en-IN')})`
+                                  : ''}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block font-medium">
                               Registration Fee
                             </span>
                             <span className="text-slate-800 font-semibold text-xs">
-                              ₹
-                              {Number(currentPaymentAmount).toLocaleString(
-                                'en-IN',
-                              )}
+                              ₹{paymentInfo.feeAmount.toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block font-medium">
+                              Coupon Code
+                            </span>
+                            <span className="text-slate-800 font-mono font-semibold text-xs">
+                              {p.couponCode
+                                ? `${p.couponCode}${paymentInfo.discount > 0 ? ` (-₹${paymentInfo.discount.toLocaleString('en-IN')})` : ''}`
+                                : 'None'}
                             </span>
                           </div>
                           <div>
@@ -5195,10 +5341,10 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                   <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 sm:px-2 py-0.5 rounded-full border border-emerald-200">
                     <CheckCircle2 size={10} className="sm:w-3 sm:h-3" />
                     {
-                      participants.filter(
-                        (p) =>
-                          (p.payment?.status || '').toLowerCase() === 'paid',
-                      ).length
+                      participants.filter((p) => {
+                        const s = (p.payment?.status || '').toLowerCase()
+                        return s === 'paid' || s === 'waived'
+                      }).length
                     }{' '}
                     Paid
                   </span>
@@ -5209,21 +5355,20 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 <div className="mt-1 flex items-center gap-1.5 text-[11px] sm:text-xs text-slate-500 flex-wrap">
                   <span className="text-emerald-700 font-medium">
                     {
-                      participants.filter(
-                        (p) =>
-                          (p.payment?.status || '').toLowerCase() === 'paid',
-                      ).length
+                      participants.filter((p) => {
+                        const s = (p.payment?.status || '').toLowerCase()
+                        return s === 'paid' || s === 'waived'
+                      }).length
                     }{' '}
                     paid
                   </span>
                   <span className="text-slate-300">·</span>
                   <span className="text-amber-700 font-medium">
                     {
-                      participants.filter(
-                        (p) =>
-                          (p.payment?.status || 'unpaid').toLowerCase() !==
-                          'paid',
-                      ).length
+                      participants.filter((p) => {
+                        const s = (p.payment?.status || 'unpaid').toLowerCase()
+                        return s !== 'paid' && s !== 'waived'
+                      }).length
                     }{' '}
                     unpaid
                   </span>

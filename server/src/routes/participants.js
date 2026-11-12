@@ -5,6 +5,7 @@ import { Participant } from '../models/Participant.js'
 import { Coupon } from '../models/Coupon.js'
 import { requireUserAuth } from '../user-auth.js'
 import { assignBibToParticipant } from '../lib/bib.js'
+import { syncCouponUsageCount } from '../lib/coupon.js'
 import { sendParticipantConfirmationEmail } from '../lib/mailer.js'
 import { ENTRY_FEE_PAISE } from '../lib/razorpay.js'
 
@@ -47,7 +48,13 @@ export async function computeParticipantPricing(user, couponCodeInput = '') {
       couponError = 'Invalid coupon code.'
     } else if (!coupon.isActive) {
       couponError = 'This coupon is currently inactive.'
-    } else if (coupon.applicableTo === 'schools') {
+    } else if (
+      coupon.applicableTo === 'schools' ||
+      (!coupon.applicableTo &&
+        ['AFFILIATE26', 'SPORTSWING', 'VIDYALAYA', 'SCHOLARPASS'].includes(
+          coupon.code,
+        ))
+    ) {
       couponError = 'This coupon is valid for school delegations only.'
     } else if (coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) {
       couponError = 'This coupon has expired.'
@@ -206,12 +213,9 @@ participantsRouter.post('/', requireUserAuth, async (req, res, next) => {
     )
 
     if (pricing.finalAmount === 0) {
-      // If 100% discount / waived, increment coupon usage and send confirmation email immediately
+      // If 100% discount / waived, sync coupon usage and send confirmation email immediately
       if (pricing.coupon) {
-        await Coupon.updateOne(
-          { code: pricing.coupon.code },
-          { $inc: { usageCount: 1 } },
-        ).catch(() => null)
+        await syncCouponUsageCount(pricing.coupon.code).catch(() => null)
       }
 
       const bibResult = await assignBibToParticipant(doc._id, {

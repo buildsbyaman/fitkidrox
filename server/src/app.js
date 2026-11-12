@@ -18,6 +18,7 @@ import {
 import mongoose from 'mongoose'
 import { dbStatus } from './db.js'
 import { assignBibToParticipant } from './lib/bib.js'
+import { syncCouponUsageCount } from './lib/coupon.js'
 import { sendParticipantConfirmationEmail } from './lib/mailer.js'
 import { createWithUniqueReference } from './lib/reference.js'
 import { Participant } from './models/Participant.js'
@@ -440,7 +441,10 @@ export function createApp({
         }
 
         let existing = null
-        if (req.params.collection === 'participants') {
+        if (
+          req.params.collection === 'participants' ||
+          req.params.collection === 'schools'
+        ) {
           existing = await Model.findOne(filter).lean()
         }
 
@@ -520,6 +524,18 @@ export function createApp({
           }
         }
 
+        if (
+          req.params.collection === 'participants' ||
+          req.params.collection === 'schools'
+        ) {
+          const affectedCodes = new Set(
+            [existing?.couponCode, doc.couponCode].filter(Boolean),
+          )
+          for (const code of affectedCodes) {
+            await syncCouponUsageCount(code).catch(() => null)
+          }
+        }
+
         res.json({ ok: true, doc })
       } catch (err) {
         next(err)
@@ -544,6 +560,14 @@ export function createApp({
 
         const doc = await Model.findOneAndDelete(filter).lean()
         if (!doc) return res.status(404).json({ error: 'Record not found.' })
+
+        if (
+          (req.params.collection === 'participants' ||
+            req.params.collection === 'schools') &&
+          doc.couponCode
+        ) {
+          await syncCouponUsageCount(doc.couponCode).catch(() => null)
+        }
 
         res.json({ ok: true, doc })
       } catch (err) {
@@ -608,33 +632,6 @@ export function createApp({
       }
     },
   )
-
-  /** DELETE /api/admin/:collection/:id — delete a document by _id or reference. */
-  app.delete(
-    '/api/admin/:collection/:id',
-    requireAuth,
-    async (req, res, next) => {
-      try {
-        const Model = ADMIN_COLLECTIONS[req.params.collection]
-        if (!Model)
-          return res.status(404).json({ error: 'Unknown collection.' })
-
-        let filter = { _id: req.params.id }
-        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-          filter = { reference: req.params.id }
-        }
-
-        const doc = await Model.findOneAndDelete(filter).lean()
-        if (!doc) return res.status(404).json({ error: 'Record not found.' })
-
-        res.json({ ok: true, doc })
-      } catch (err) {
-        next(err)
-      }
-    },
-  )
-
-
 
   // Anything under /api that no route matched. Placed here so a mounted SSR
   // handler later can own everything outside /api.

@@ -1,6 +1,7 @@
 import { Router } from 'express'
 
 import { createWithUniqueReference } from '../lib/reference.js'
+import { syncCouponUsageCount } from '../lib/coupon.js'
 import { sendSchoolConfirmationEmail } from '../lib/mailer.js'
 import { School } from '../models/School.js'
 import { Coupon } from '../models/Coupon.js'
@@ -165,13 +166,10 @@ schoolsRouter.post('/', async (req, res, next) => {
       'SCH',
     )
 
-    // If 100% discount / waived, increment coupon usage and send confirmation email immediately
+    // If 100% discount / waived, sync coupon usage and send confirmation email immediately
     if (!requiresPayment) {
       if (pricing.coupon) {
-        await Coupon.updateOne(
-          { code: pricing.coupon.code },
-          { $inc: { usageCount: 1 } },
-        )
+        await syncCouponUsageCount(pricing.coupon.code).catch(() => null)
       }
       sendSchoolConfirmationEmail({ school: doc }).catch((err) =>
         console.error(
@@ -256,6 +254,9 @@ schoolsRouter.post('/create-order', async (req, res) => {
           },
         },
       )
+      if (school.couponCode) {
+        await syncCouponUsageCount(school.couponCode).catch(() => null)
+      }
       sendSchoolConfirmationEmail({ school }).catch((err) =>
         console.error(
           '[mailer] Failed to send waived school confirmation email:',
@@ -372,12 +373,9 @@ schoolsRouter.post('/verify-payment', async (req, res) => {
       { new: true },
     ).lean()
 
-    // Increment coupon usage count
+    // Sync coupon usage count
     if (updatedSchool.couponCode) {
-      await Coupon.updateOne(
-        { code: updatedSchool.couponCode },
-        { $inc: { usageCount: 1 } },
-      )
+      await syncCouponUsageCount(updatedSchool.couponCode).catch(() => null)
     }
 
     // Send confirmation email asynchronously
