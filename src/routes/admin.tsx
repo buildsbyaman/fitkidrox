@@ -4572,7 +4572,7 @@ function AddCouponModal({
                   type="number"
                   min="0"
                   max={discountType === 'percentage' ? '100' : undefined}
-                  step={discountType === 'percentage' ? '1' : '50'}
+                  step={discountType === 'percentage' ? 'any' : '1'}
                   required
                   placeholder={
                     discountType === 'per_student_rate'
@@ -4629,7 +4629,7 @@ function AddCouponModal({
                 <input
                   type="number"
                   min="1"
-                  step="100"
+                  step="1"
                   value={maxDiscount}
                   onChange={(e) => setMaxDiscount(e.target.value)}
                   placeholder="e.g. 5000 (leave blank for none)"
